@@ -1,0 +1,23 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+html {
+  background: #020617;
+}
+
+body {
+  font-family: 'Segoe UI', system-ui, sans-serif;
+  margin: 0;
+  padding: 0;
+  background: #020617;
+  color: #e2e8f0;
+}
+
+#root {
+  min-height: 100vh;
+}
+
+* {
+  box-sizing: border-box;
+}
