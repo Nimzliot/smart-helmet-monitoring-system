@@ -28,7 +28,21 @@ const authorizeRoles = (...roles) => (req, _res, next) => {
   return next();
 };
 
+const authenticateDevice = (req, _res, next) => {
+  if (!env.deviceApiKey) {
+    return next();
+  }
+
+  const providedKey = req.headers["x-device-key"];
+  if (!providedKey || providedKey !== env.deviceApiKey) {
+    return next(new AppError("Valid device key is required", 401));
+  }
+
+  return next();
+};
+
 module.exports = {
   authenticate,
   authorizeRoles,
+  authenticateDevice,
 };

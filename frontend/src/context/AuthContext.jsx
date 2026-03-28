@@ -1,10 +1,11 @@
 import { createContext, useContext, useEffect, useMemo, useState } from 'react';
-import { loginRequest } from '../services/auth';
+import { loginRequest, meRequest } from '../services/auth';
 
 const AuthContext = createContext(null);
 const STORAGE_KEY = 'smart-helmet-auth';
 
 export function AuthProvider({ children }) {
+  const [isLoading, setIsLoading] = useState(true);
   const [session, setSession] = useState(() => {
     try {
       const saved = localStorage.getItem(STORAGE_KEY);
@@ -22,21 +23,56 @@ export function AuthProvider({ children }) {
     }
   }, [session]);
 
+  useEffect(() => {
+    let cancelled = false;
+
+    const restoreSession = async () => {
+      if (!session?.token) {
+        setIsLoading(false);
+        return;
+      }
+
+      try {
+        const response = await meRequest(session.token);
+        if (!cancelled) {
+          setSession((current) => (current ? { ...current, user: response.user } : current));
+        }
+      } catch {
+        if (!cancelled) {
+          setSession(null);
+        }
+      } finally {
+        if (!cancelled) {
+          setIsLoading(false);
+        }
+      }
+    };
+
+    restoreSession();
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
   const value = useMemo(
     () => ({
       token: session?.token || null,
       user: session?.user || null,
       isAuthenticated: Boolean(session?.token),
+      isLoading,
       async login(credentials) {
         const nextSession = await loginRequest(credentials);
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(nextSession));
         setSession(nextSession);
         return nextSession;
       },
       logout() {
+        localStorage.removeItem(STORAGE_KEY);
         setSession(null);
       },
     }),
-    [session]
+    [isLoading, session]
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

@@ -23,7 +23,7 @@ export default function Settings() {
           <h3 className="text-lg font-semibold text-white">Platform configuration</h3>
           <div className="mt-4 space-y-3 text-sm text-slate-400">
             <p>Backend URL: <span className="text-slate-200">{backendBaseUrl}</span></p>
-            <p>JWT login enabled for admin and monitor roles.</p>
+            <p>JWT login enabled for the admin dashboard.</p>
             <p>Supabase remains optional because the app can fall back to in-memory data for demos.</p>
           </div>
         </div>

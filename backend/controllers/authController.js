@@ -6,7 +6,7 @@ const { signToken } = require("../utils/token");
 
 const login = asyncHandler(async (req, res) => {
   const { email, password } = req.body;
-  const user = db.authenticateUser(email, password);
+  const user = await db.authenticateUser(email, password);
 
   if (!user) {
     throw new AppError("Invalid email or password", 401);
@@ -25,15 +25,24 @@ const login = asyncHandler(async (req, res) => {
 
   res.json({
     token,
-    user: {
-      id: user.id,
-      name: user.name,
-      email: user.email,
-      role: user.role,
+    user: db.sanitizeUser(user),
+  });
+});
+
+const me = asyncHandler(async (req, res) => {
+  const user = await db.getUserById(req.user.sub);
+
+  res.json({
+    user: user || {
+      id: req.user.sub,
+      name: req.user.name,
+      email: req.user.email,
+      role: req.user.role,
     },
   });
 });
 
 module.exports = {
   login,
+  me,
 };

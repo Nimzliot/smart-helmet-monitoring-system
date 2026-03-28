@@ -86,18 +86,22 @@ class DatabaseService {
         password: "admin123",
         role: "admin",
       },
-      {
-        id: "U002",
-        name: "Monitor",
-        email: "monitor@smarthelmet.local",
-        password: "monitor123",
-        role: "monitor",
-      },
     ];
   }
 
   isConfigured() {
     return configured && Boolean(supabase);
+  }
+
+  sanitizeUser(user) {
+    if (!user) return null;
+
+    return {
+      id: user.id,
+      name: user.name,
+      email: user.email,
+      role: user.role,
+    };
   }
 
   buildHelmetRecord(payload) {
@@ -369,8 +373,37 @@ class DatabaseService {
     return this.memory.riders.find((item) => item.id === helmet.rider_id) || null;
   }
 
-  authenticateUser(email, password) {
-    return this.users.find((user) => user.email === email && user.password === password) || null;
+  async authenticateUser(email, password) {
+    return this.safeSupabase(
+      async () => {
+        const { data, error } = await supabase
+          .from("users")
+          .select("id, name, email, role, password")
+          .eq("email", email)
+          .eq("password", password)
+          .limit(1);
+
+        if (error) throw error;
+        return data[0] || this.users.find((user) => user.email === email && user.password === password) || null;
+      },
+      async () => this.users.find((user) => user.email === email && user.password === password) || null
+    );
+  }
+
+  async getUserById(userId) {
+    return this.safeSupabase(
+      async () => {
+        const { data, error } = await supabase
+          .from("users")
+          .select("id, name, email, role")
+          .eq("id", userId)
+          .limit(1);
+
+        if (error) throw error;
+        return data[0] || this.sanitizeUser(this.users.find((user) => user.id === userId)) || null;
+      },
+      async () => this.sanitizeUser(this.users.find((user) => user.id === userId)) || null
+    );
   }
 
   async getSystemHealth() {

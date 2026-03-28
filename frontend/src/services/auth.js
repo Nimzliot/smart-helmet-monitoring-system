@@ -6,3 +6,10 @@ export function loginRequest(credentials) {
     body: JSON.stringify(credentials),
   });
 }
+
+export function meRequest(token) {
+  return apiRequest('/api/auth/me', {
+    method: 'GET',
+    token,
+  });
+}

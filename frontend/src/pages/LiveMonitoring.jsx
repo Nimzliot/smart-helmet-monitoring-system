@@ -18,7 +18,7 @@ export default function LiveMonitoring() {
         <div>
           <h2 className="mb-2 text-2xl font-bold">Waiting for Live Data</h2>
           <p className="mx-auto max-w-md text-slate-400">
-            The system is connected to the WebSocket server but has not received telemetry yet. Start the simulator or connect a helmet.
+            The system is connected to the WebSocket server but has not received telemetry yet. Start the simulator or connect the ESP32 device.
           </p>
         </div>
       </div>
@@ -39,7 +39,7 @@ export default function LiveMonitoring() {
       <PageHeader
         eyebrow="Telemetry"
         title="Embedded live monitoring"
-        description="Streaming ESP32 telemetry with MQ-3 alcohol readings, IR eye-blink activity, MPU6050 motion values, and rider safety events."
+        description="Streaming ESP32 device telemetry with rider condition, MPU6050 motion values, and live safety events."
         action={<SignalIndicator signal={connectionStatus === 'ONLINE' ? 'STRONG' : connectionStatus === 'DEGRADED' ? 'MODERATE' : 'WEAK'} />}
       />
 
@@ -87,13 +87,13 @@ export default function LiveMonitoring() {
         <div className="rounded-3xl border border-slate-800 bg-slate-950/70 p-5">
           <p className="text-sm text-slate-400">MPU6050 Accelerometer</p>
           <p className="mt-3 text-lg font-semibold text-white">
-            X: {liveData.accel_x ?? '--'} • Y: {liveData.accel_y ?? '--'} • Z: {liveData.accel_z ?? '--'}
+            X: {liveData.accel_x ?? '--'} / Y: {liveData.accel_y ?? '--'} / Z: {liveData.accel_z ?? '--'}
           </p>
         </div>
         <div className="rounded-3xl border border-slate-800 bg-slate-950/70 p-5">
           <p className="text-sm text-slate-400">MPU6050 Gyroscope</p>
           <p className="mt-3 text-lg font-semibold text-white">
-            X: {liveData.gyro_x ?? '--'} • Y: {liveData.gyro_y ?? '--'} • Z: {liveData.gyro_z ?? '--'}
+            X: {liveData.gyro_x ?? '--'} / Y: {liveData.gyro_y ?? '--'} / Z: {liveData.gyro_z ?? '--'}
           </p>
         </div>
       </div>
@@ -103,11 +103,9 @@ export default function LiveMonitoring() {
         <p className="mt-3 text-2xl font-semibold">
           Level {severity.level || 0} - {severity.label}
         </p>
-        <p className="mt-3 text-sm">
-          Severity Score = Acceleration + Tilt Angle + Impact Force
-        </p>
+        <p className="mt-3 text-sm">Severity Score = Acceleration + Tilt Angle + Impact Force</p>
         <p className="mt-2 text-sm">
-          Acceleration: {severity.acceleration.toFixed(2)} • Tilt Angle: {severity.tiltAngle.toFixed(2)} • Impact Force: {severity.impactForce.toFixed(2)}
+          Acceleration: {severity.acceleration.toFixed(2)} / Tilt Angle: {severity.tiltAngle.toFixed(2)} / Impact Force: {severity.impactForce.toFixed(2)}
         </p>
       </div>
 
@@ -119,7 +117,7 @@ export default function LiveMonitoring() {
               <SignalIndicator signal={item.signal_strength || 'MODERATE'} />
             </div>
             <p className="mt-3 text-sm text-slate-400">{new Date(item.timestamp).toLocaleString()}</p>
-            <p className="mt-3 text-sm text-slate-300">GPS {item.latitude ?? '--'}, {item.longitude ?? '--'}</p>
+            <p className="mt-3 text-sm text-slate-300">Communication mode: {item.communication_mode || 'HTTP'}</p>
           </div>
         ))}
       </div>

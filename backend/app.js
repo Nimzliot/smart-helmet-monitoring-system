@@ -12,7 +12,14 @@ const app = express();
 
 app.use(
   cors({
-    origin: env.frontendUrl === "*" ? true : env.frontendUrl,
+    origin(origin, callback) {
+      if (!origin || env.frontendOrigins.includes("*") || env.frontendOrigins.includes(origin)) {
+        return callback(null, true);
+      }
+
+      return callback(new Error(`Origin ${origin} is not allowed by CORS`));
+    },
+    credentials: true,
   })
 );
 app.use(express.json());

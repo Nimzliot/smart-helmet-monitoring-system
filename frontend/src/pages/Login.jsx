@@ -36,13 +36,13 @@ export default function Login() {
         <section className="hidden rounded-[2rem] border border-slate-800 bg-slate-950/60 p-10 backdrop-blur lg:block">
           <p className="text-xs uppercase tracking-[0.34em] text-cyan-300">Smart Helmet Rider Monitoring System</p>
           <h1 className="mt-6 max-w-xl text-5xl font-semibold leading-tight text-white">
-            Production-style command center for helmet telemetry, GPS safety, and emergency response.
+            A polished command center for rider telemetry, accident severity, and emergency response.
           </h1>
           <div className="mt-10 grid gap-4 md:grid-cols-3">
             {[
               ['Real-time telemetry', 'Live battery, fall, drowsiness, alcohol, and signal streaming'],
-              ['Rider operations', 'Track riders, helmets, assignments, and live health'],
-              ['Emergency workflow', 'Alert generation with console-based emergency notifications'],
+              ['Operator visibility', 'Track riders, helmets, assignments, system health, and current risk'],
+              ['Emergency workflow', 'Alert generation with severity tracking and emergency escalation copy'],
             ].map(([title, body]) => (
               <div key={title} className="rounded-3xl border border-slate-800 bg-slate-900/70 p-5">
                 <p className="font-semibold text-white">{title}</p>
@@ -59,7 +59,7 @@ export default function Login() {
             </div>
             <h2 className="text-2xl font-semibold text-white">Secure Operator Login</h2>
             <p className="mt-2 text-center text-sm text-slate-400">
-              Use <span className="font-semibold text-slate-200">admin@smarthelmet.local / admin123</span> or monitor credentials to enter the control room.
+              Use <span className="font-semibold text-slate-200">admin@smarthelmet.local / admin123</span> to enter the control room.
             </p>
           </div>
 

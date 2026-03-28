@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import BatteryIndicator from '../components/BatteryIndicator';
 import PageHeader from '../components/PageHeader';
 import { apiRequest } from '../services/api';
+import { useAuth } from '../hooks/useAuth';
 
 const initialForm = {
   helmet_id: '',
@@ -11,12 +12,18 @@ const initialForm = {
 };
 
 export default function Helmets() {
+  const { user } = useAuth();
   const [helmets, setHelmets] = useState([]);
   const [riders, setRiders] = useState([]);
   const [form, setForm] = useState(initialForm);
+  const [loading, setLoading] = useState(true);
+  const [submitting, setSubmitting] = useState(false);
+  const [feedback, setFeedback] = useState('');
+  const isAdmin = user?.role === 'admin';
 
   const load = async () => {
     try {
+      setLoading(true);
       const [helmetData, riderData] = await Promise.all([
         apiRequest('/api/helmets'),
         apiRequest('/api/riders'),
@@ -24,7 +31,9 @@ export default function Helmets() {
       setHelmets(helmetData);
       setRiders(riderData);
     } catch (err) {
-      console.error(err);
+      setFeedback(err.message);
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -34,6 +43,8 @@ export default function Helmets() {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    setFeedback('');
+    setSubmitting(true);
     try {
       await apiRequest('/api/helmets', {
         method: 'POST',
@@ -44,8 +55,11 @@ export default function Helmets() {
       });
       setForm(initialForm);
       await load();
+      setFeedback('Helmet saved successfully.');
     } catch (err) {
-      console.error(err);
+      setFeedback(err.message);
+    } finally {
+      setSubmitting(false);
     }
   };
 
@@ -54,18 +68,21 @@ export default function Helmets() {
       <PageHeader
         eyebrow="Helmets"
         title="Helmet registry"
-        description="Track available helmets, assign riders, review live status, and manage battery readiness."
+        description="Track available helmets, assign riders, review live status, and keep battery readiness visible for operators."
       />
 
       <div className="grid gap-6 xl:grid-cols-[0.95fr_1.05fr]">
         <form onSubmit={handleSubmit} className="space-y-4 rounded-[2rem] border border-slate-800 bg-slate-950/70 p-6">
+          <div className="rounded-2xl border border-slate-800 bg-slate-900/70 px-4 py-3 text-sm text-slate-400">
+            {isAdmin ? 'Admin access enabled. You can add helmets and assign riders.' : 'Monitor access detected. Helmet creation is disabled for this role.'}
+          </div>
           <label className="block">
             <span className="mb-2 block text-sm text-slate-400">Helmet ID</span>
-            <input required value={form.helmet_id} onChange={(e) => setForm((current) => ({ ...current, helmet_id: e.target.value }))} className="w-full rounded-2xl border border-slate-800 bg-slate-900 px-4 py-3 text-white outline-none focus:ring-2 focus:ring-cyan-400" />
+            <input required disabled={!isAdmin} value={form.helmet_id} onChange={(e) => setForm((current) => ({ ...current, helmet_id: e.target.value }))} className="w-full rounded-2xl border border-slate-800 bg-slate-900 px-4 py-3 text-white outline-none focus:ring-2 focus:ring-cyan-400" />
           </label>
           <label className="block">
             <span className="mb-2 block text-sm text-slate-400">Assigned Rider</span>
-            <select value={form.rider_id} onChange={(e) => setForm((current) => ({ ...current, rider_id: e.target.value }))} className="w-full rounded-2xl border border-slate-800 bg-slate-900 px-4 py-3 text-white outline-none focus:ring-2 focus:ring-cyan-400">
+            <select disabled={!isAdmin} value={form.rider_id} onChange={(e) => setForm((current) => ({ ...current, rider_id: e.target.value }))} className="w-full rounded-2xl border border-slate-800 bg-slate-900 px-4 py-3 text-white outline-none focus:ring-2 focus:ring-cyan-400">
               <option value="">Unassigned</option>
               {riders.map((rider) => (
                 <option key={rider.id} value={rider.id}>{rider.name}</option>
@@ -74,7 +91,7 @@ export default function Helmets() {
           </label>
           <label className="block">
             <span className="mb-2 block text-sm text-slate-400">Status</span>
-            <select value={form.status} onChange={(e) => setForm((current) => ({ ...current, status: e.target.value }))} className="w-full rounded-2xl border border-slate-800 bg-slate-900 px-4 py-3 text-white outline-none focus:ring-2 focus:ring-cyan-400">
+            <select disabled={!isAdmin} value={form.status} onChange={(e) => setForm((current) => ({ ...current, status: e.target.value }))} className="w-full rounded-2xl border border-slate-800 bg-slate-900 px-4 py-3 text-white outline-none focus:ring-2 focus:ring-cyan-400">
               <option value="IDLE">IDLE</option>
               <option value="ACTIVE">ACTIVE</option>
               <option value="ALERT">ALERT</option>
@@ -82,14 +99,20 @@ export default function Helmets() {
           </label>
           <label className="block">
             <span className="mb-2 block text-sm text-slate-400">Battery Level</span>
-            <input type="number" min="0" max="100" value={form.battery_level} onChange={(e) => setForm((current) => ({ ...current, battery_level: e.target.value }))} className="w-full rounded-2xl border border-slate-800 bg-slate-900 px-4 py-3 text-white outline-none focus:ring-2 focus:ring-cyan-400" />
+            <input type="number" min="0" max="100" disabled={!isAdmin} value={form.battery_level} onChange={(e) => setForm((current) => ({ ...current, battery_level: e.target.value }))} className="w-full rounded-2xl border border-slate-800 bg-slate-900 px-4 py-3 text-white outline-none focus:ring-2 focus:ring-cyan-400" />
           </label>
-          <button type="submit" className="rounded-2xl bg-cyan-400 px-4 py-3 font-semibold text-slate-950 transition hover:brightness-110">
-            Save Helmet
+          {feedback ? (
+            <div className="rounded-2xl border border-slate-800 bg-slate-900/70 px-4 py-3 text-sm text-slate-300">
+              {feedback}
+            </div>
+          ) : null}
+          <button type="submit" disabled={submitting || !isAdmin} className="rounded-2xl bg-cyan-400 px-4 py-3 font-semibold text-slate-950 transition hover:brightness-110 disabled:opacity-60">
+            {submitting ? 'Saving...' : 'Save Helmet'}
           </button>
         </form>
 
         <div className="space-y-4 rounded-[2rem] border border-slate-800 bg-slate-950/70 p-6">
+          {loading ? <p className="text-sm text-slate-400">Loading helmets...</p> : null}
           {helmets.map((helmet) => (
             <div key={helmet.helmet_id} className="rounded-3xl border border-slate-800 bg-slate-900/80 p-5">
               <div className="flex items-center justify-between gap-4">
@@ -104,6 +127,7 @@ export default function Helmets() {
               </div>
             </div>
           ))}
+          {!loading && helmets.length === 0 ? <p className="text-sm text-slate-500">No helmets registered yet.</p> : null}
         </div>
       </div>
     </div>

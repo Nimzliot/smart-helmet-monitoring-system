@@ -1,48 +1,58 @@
+import { Suspense, lazy } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { SocketProvider } from './context/SocketContext';
 import { AuthProvider } from './context/AuthContext';
 import ProtectedRoute from './components/ProtectedRoute';
 import AppLayout from './layouts/AppLayout';
-import Login from './pages/Login';
-import Dashboard from './pages/Dashboard';
-import LiveMonitoring from './pages/LiveMonitoring';
-import MapTracking from './pages/MapTracking';
-import Alerts from './pages/Alerts';
-import History from './pages/History';
-import Analytics from './pages/Analytics';
-import Riders from './pages/Riders';
-import Helmets from './pages/Helmets';
-import Settings from './pages/Settings';
+
+const Login = lazy(() => import('./pages/Login'));
+const Dashboard = lazy(() => import('./pages/Dashboard'));
+const LiveMonitoring = lazy(() => import('./pages/LiveMonitoring'));
+const Alerts = lazy(() => import('./pages/Alerts'));
+const History = lazy(() => import('./pages/History'));
+const Analytics = lazy(() => import('./pages/Analytics'));
+const Riders = lazy(() => import('./pages/Riders'));
+const Helmets = lazy(() => import('./pages/Helmets'));
+const Settings = lazy(() => import('./pages/Settings'));
+
+function RouteLoader() {
+  return (
+    <div className="flex min-h-screen items-center justify-center bg-slate-950 text-slate-300">
+      Loading Smart Helmet dashboard...
+    </div>
+  );
+}
 
 function App() {
   return (
     <AuthProvider>
       <SocketProvider>
         <Router>
-          <Routes>
-            <Route path="/login" element={<Login />} />
-            <Route
-              path="*"
-              element={
-                <ProtectedRoute>
-                  <AppLayout>
-                    <Routes>
-                      <Route path="/" element={<Dashboard />} />
-                      <Route path="/live" element={<LiveMonitoring />} />
-                      <Route path="/map" element={<MapTracking />} />
-                      <Route path="/alerts" element={<Alerts />} />
-                      <Route path="/history" element={<History />} />
-                      <Route path="/analytics" element={<Analytics />} />
-                      <Route path="/riders" element={<Riders />} />
-                      <Route path="/helmets" element={<Helmets />} />
-                      <Route path="/settings" element={<Settings />} />
-                      <Route path="*" element={<Navigate to="/" replace />} />
-                    </Routes>
-                  </AppLayout>
-                </ProtectedRoute>
-              }
-            />
-          </Routes>
+          <Suspense fallback={<RouteLoader />}>
+            <Routes>
+              <Route path="/login" element={<Login />} />
+              <Route
+                path="*"
+                element={
+                  <ProtectedRoute>
+                    <AppLayout>
+                      <Routes>
+                        <Route path="/" element={<Dashboard />} />
+                        <Route path="/live" element={<LiveMonitoring />} />
+                        <Route path="/alerts" element={<Alerts />} />
+                        <Route path="/history" element={<History />} />
+                        <Route path="/analytics" element={<Analytics />} />
+                        <Route path="/riders" element={<Riders />} />
+                        <Route path="/helmets" element={<Helmets />} />
+                        <Route path="/settings" element={<Settings />} />
+                        <Route path="*" element={<Navigate to="/" replace />} />
+                      </Routes>
+                    </AppLayout>
+                  </ProtectedRoute>
+                }
+              />
+            </Routes>
+          </Suspense>
         </Router>
       </SocketProvider>
     </AuthProvider>

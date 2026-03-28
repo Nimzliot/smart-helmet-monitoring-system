@@ -2,18 +2,25 @@ import { apiUrl } from '../config';
 
 const readJson = async (response) => {
   const text = await response.text();
-  return text ? JSON.parse(text) : null;
+  if (!text) return null;
+
+  try {
+    return JSON.parse(text);
+  } catch {
+    return { error: text };
+  }
 };
 
 export async function apiRequest(path, options = {}) {
-  const auth = JSON.parse(localStorage.getItem('smart-helmet-auth') || 'null');
+  const auth = options.skipAuth ? null : JSON.parse(localStorage.getItem('smart-helmet-auth') || 'null');
   const headers = {
-    'Content-Type': 'application/json',
+    ...(options.body ? { 'Content-Type': 'application/json' } : {}),
     ...(options.headers || {}),
   };
 
-  if (auth?.token) {
-    headers.Authorization = `Bearer ${auth.token}`;
+  const token = options.token || auth?.token;
+  if (token) {
+    headers.Authorization = `Bearer ${token}`;
   }
 
   const response = await fetch(apiUrl(path), {
@@ -23,7 +30,7 @@ export async function apiRequest(path, options = {}) {
 
   const data = await readJson(response);
   if (!response.ok) {
-    throw new Error(data?.error || 'Request failed');
+    throw new Error(data?.error || data?.message || 'Request failed');
   }
 
   return data;

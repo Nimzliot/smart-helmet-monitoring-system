@@ -20,6 +20,7 @@ import { getAccidentSeverity } from '../utils/severity';
 export default function Analytics() {
   const [summary, setSummary] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
 
   useEffect(() => {
     const fetchAndProcess = async () => {
@@ -69,7 +70,7 @@ export default function Analytics() {
           })),
         });
       } catch (err) {
-        console.error(err);
+        setError(err.message);
       } finally {
         setLoading(false);
       }
@@ -79,6 +80,10 @@ export default function Analytics() {
   }, []);
 
   if (loading) return <div className="animate-pulse text-slate-400">Loading analytics...</div>;
+
+  if (error) {
+    return <div className="rounded-3xl border border-rose-500/20 bg-rose-500/10 p-8 text-rose-100">{error}</div>;
+  }
 
   return (
     <div className="space-y-8">

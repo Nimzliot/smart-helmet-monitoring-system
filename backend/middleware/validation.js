@@ -42,21 +42,46 @@ const fieldSource = {
   query: (req) => req.query || {},
 };
 
+const hasHelmetIdentifier = (body) => Boolean(body.helmet_id || body.device_id);
+const isOptionalNumeric = (value) => value === undefined || value === null || value === "" || Number.isFinite(Number(value));
+const isOptionalBooleanLike = (value) =>
+  value === undefined ||
+  value === null ||
+  value === "" ||
+  value === true ||
+  value === false ||
+  value === 0 ||
+  value === 1 ||
+  value === "0" ||
+  value === "1";
+
 const validators = {
   helmetData: expressValidator
     ? validate([
-        expressValidator.body("helmet_id").notEmpty().withMessage("helmet_id is required"),
+        expressValidator
+          .body()
+          .custom((body) => hasHelmetIdentifier(body))
+          .withMessage("helmet_id or device_id is required"),
         expressValidator.body("battery_status").optional().isInt({ min: 0, max: 100 }),
         expressValidator.body("alcohol_value").optional().isNumeric(),
+        expressValidator.body("alcohol_level").optional().isNumeric(),
         expressValidator.body("blink_rate").optional().isNumeric(),
         expressValidator.body("eye_closure_duration").optional().isNumeric(),
         expressValidator.body("accel_x").optional().isNumeric(),
         expressValidator.body("accel_y").optional().isNumeric(),
         expressValidator.body("accel_z").optional().isNumeric(),
+        expressValidator.body("acceleration_x").optional().isNumeric(),
+        expressValidator.body("acceleration_y").optional().isNumeric(),
+        expressValidator.body("acceleration_z").optional().isNumeric(),
+        expressValidator.body("acceleration.x").optional().isNumeric(),
+        expressValidator.body("acceleration.y").optional().isNumeric(),
+        expressValidator.body("acceleration.z").optional().isNumeric(),
         expressValidator.body("gyro_x").optional().isNumeric(),
         expressValidator.body("gyro_y").optional().isNumeric(),
         expressValidator.body("gyro_z").optional().isNumeric(),
         expressValidator.body("battery_voltage").optional().isNumeric(),
+        expressValidator.body("drowsiness_status").optional().isInt({ min: 0, max: 1 }),
+        expressValidator.body("accident_detected").optional().isInt({ min: 0, max: 1 }),
         expressValidator.body("latitude").optional().isFloat({ min: -90, max: 90 }),
         expressValidator.body("longitude").optional().isFloat({ min: -180, max: 180 }),
       ])
@@ -64,8 +89,8 @@ const validators = {
         {
           field: "helmet_id",
           source: fieldSource.body,
-          validate: (value) => Boolean(value),
-          message: "helmet_id is required",
+          validate: (_value, req) => hasHelmetIdentifier(req.body || {}),
+          message: "helmet_id or device_id is required",
         },
         {
           field: "battery_status",
@@ -77,20 +102,50 @@ const validators = {
         {
           field: "alcohol_value",
           source: fieldSource.body,
-          validate: (value) => value === undefined || Number.isFinite(Number(value)),
+          validate: (value) => isOptionalNumeric(value),
           message: "alcohol_value must be numeric",
+        },
+        {
+          field: "alcohol_level",
+          source: fieldSource.body,
+          validate: (value) => isOptionalNumeric(value),
+          message: "alcohol_level must be numeric",
         },
         {
           field: "blink_rate",
           source: fieldSource.body,
-          validate: (value) => value === undefined || Number.isFinite(Number(value)),
+          validate: (value) => isOptionalNumeric(value),
           message: "blink_rate must be numeric",
         },
         {
           field: "eye_closure_duration",
           source: fieldSource.body,
-          validate: (value) => value === undefined || Number.isFinite(Number(value)),
+          validate: (value) => isOptionalNumeric(value),
           message: "eye_closure_duration must be numeric",
+        },
+        {
+          field: "accident_detected",
+          source: fieldSource.body,
+          validate: (value) => isOptionalBooleanLike(value),
+          message: "accident_detected must be 0 or 1",
+        },
+        {
+          field: "drowsiness_status",
+          source: fieldSource.body,
+          validate: (value) => isOptionalBooleanLike(value),
+          message: "drowsiness_status must be 0 or 1",
+        },
+        {
+          field: "acceleration",
+          source: fieldSource.body,
+          validate: (value) =>
+            value === undefined ||
+            value === null ||
+            (typeof value === "object" &&
+              isOptionalNumeric(value.x) &&
+              isOptionalNumeric(value.y) &&
+              isOptionalNumeric(value.z)),
+          message: "acceleration must include numeric x, y, and z values",
         },
       ]),
   rider: expressValidator

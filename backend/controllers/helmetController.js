@@ -7,30 +7,49 @@ const buildMockStatus = () => ({
   mock: true,
 });
 
-const postHelmetData = asyncHandler(async (req, res) => {
-  const payload = {
-    helmet_id: req.body.helmet_id,
-    alcohol_value: req.body.alcohol_value,
-    eye_blink_detected: req.body.eye_blink_detected,
-    blink_rate: req.body.blink_rate,
-    eye_closure_duration: req.body.eye_closure_duration,
-    accel_x: req.body.accel_x,
-    accel_y: req.body.accel_y,
-    accel_z: req.body.accel_z,
-    gyro_x: req.body.gyro_x,
-    gyro_y: req.body.gyro_y,
-    gyro_z: req.body.gyro_z,
-    battery_voltage: req.body.battery_voltage,
-    communication_mode: req.body.communication_mode,
-    alcohol_detected: req.body.alcohol_detected,
-    drowsiness: req.body.drowsiness,
-    fall_detected: req.body.fall_detected,
-    battery_status: req.body.battery_status,
-    timestamp: req.body.timestamp,
-    latitude: req.body.latitude,
-    longitude: req.body.longitude,
-    signal_strength: req.body.signal_strength,
+const normalizeHardwarePayload = (body) => {
+  const acceleration = body.acceleration || {};
+  const drowsinessDetected =
+    body.drowsiness !== undefined
+      ? body.drowsiness
+      : body.drowsiness_status !== undefined
+        ? Number(body.drowsiness_status) === 0
+        : undefined;
+
+  const eyeBlinkDetected =
+    body.eye_blink_detected !== undefined
+      ? body.eye_blink_detected
+      : body.drowsiness_status !== undefined
+        ? Number(body.drowsiness_status) === 0
+        : undefined;
+
+  return {
+    helmet_id: body.helmet_id || body.device_id,
+    alcohol_value: body.alcohol_value ?? body.alcohol_level,
+    eye_blink_detected: eyeBlinkDetected,
+    blink_rate: body.blink_rate,
+    eye_closure_duration: body.eye_closure_duration,
+    accel_x: body.accel_x ?? body.acceleration_x ?? acceleration.x,
+    accel_y: body.accel_y ?? body.acceleration_y ?? acceleration.y,
+    accel_z: body.accel_z ?? body.acceleration_z ?? acceleration.z,
+    gyro_x: body.gyro_x,
+    gyro_y: body.gyro_y,
+    gyro_z: body.gyro_z,
+    battery_voltage: body.battery_voltage,
+    communication_mode: body.communication_mode,
+    alcohol_detected: body.alcohol_detected,
+    drowsiness: drowsinessDetected,
+    fall_detected: body.fall_detected ?? body.accident_detected,
+    battery_status: body.battery_status,
+    timestamp: body.timestamp,
+    latitude: body.latitude,
+    longitude: body.longitude,
+    signal_strength: body.signal_strength,
   };
+};
+
+const postHelmetData = asyncHandler(async (req, res) => {
+  const payload = normalizeHardwarePayload(req.body);
 
   const { record, helmet } = await db.createHelmetLog(payload);
   const alerts = await createAlertsFromRecord(record);

@@ -9,13 +9,14 @@ export default function History() {
   const [history, setHistory] = useState([]);
   const [loading, setLoading] = useState(true);
   const [query, setQuery] = useState('');
+  const [error, setError] = useState('');
 
   useEffect(() => {
     const fetchHistory = async () => {
       try {
         setHistory(await apiRequest('/api/history'));
       } catch (err) {
-        console.error(err);
+        setError(err.message);
       } finally {
         setLoading(false);
       }
@@ -25,6 +26,10 @@ export default function History() {
   }, []);
 
   if (loading) return <div className="animate-pulse text-slate-400">Loading history...</div>;
+
+  if (error) {
+    return <div className="rounded-3xl border border-rose-500/20 bg-rose-500/10 p-8 text-rose-100">{error}</div>;
+  }
 
   const filtered = history.filter((record) => record.helmet_id.toLowerCase().includes(query.toLowerCase()));
   const severityStyles = {
@@ -39,7 +44,7 @@ export default function History() {
       <PageHeader
         eyebrow="Records"
         title="Telemetry history"
-        description="Review recent ESP32 telemetry including MQ-3 alcohol readings, IR eye-blink behavior, MPU6050 motion data, battery condition, and derived safety flags."
+        description="Review recent device telemetry, battery condition, and derived safety flags from connected helmets."
       />
 
       <div className="overflow-hidden rounded-[2rem] border border-slate-800 bg-slate-950">
@@ -47,7 +52,7 @@ export default function History() {
           <Search size={18} className="text-slate-500" />
           <input
             type="text"
-            placeholder="Search by Helmet ID..."
+            placeholder="Search by Device / Helmet ID..."
             className="w-full border-none bg-transparent text-sm text-white outline-none placeholder-slate-600"
             value={query}
             onChange={(e) => setQuery(e.target.value)}
@@ -59,8 +64,7 @@ export default function History() {
             <thead>
               <tr className="border-b border-slate-800 bg-slate-800/50 text-sm text-slate-400">
                 <th className="p-4 font-medium">Time</th>
-                <th className="p-4 font-medium">Helmet</th>
-                <th className="p-4 font-medium">Location</th>
+                <th className="p-4 font-medium">Device</th>
                 <th className="p-4 font-medium">Signal</th>
                 <th className="p-4 font-medium">MQ-3</th>
                 <th className="p-4 font-medium">Eye Blink</th>
@@ -86,36 +90,32 @@ export default function History() {
                   : getAccidentSeverity(record);
 
                 return (
-                <tr key={record.id || record.timestamp} className="text-sm transition-colors hover:bg-slate-800/30">
-                  <td className="p-4 font-mono text-xs text-slate-300">{new Date(record.timestamp).toLocaleString()}</td>
-                  <td className="p-4 font-medium text-cyan-400">{record.helmet_id}</td>
-                  <td className="p-4 text-xs text-slate-400">{record.latitude ?? '--'}, {record.longitude ?? '--'}</td>
-                  <td className="p-4"><SignalIndicator signal={record.signal_strength || 'MODERATE'} /></td>
-                  <td className="p-4 text-xs text-slate-300">{record.alcohol_value ?? '--'}</td>
-                  <td className="p-4 text-xs text-slate-300">
-                    {record.blink_rate ?? '--'} / {record.eye_closure_duration ?? '--'}s
-                  </td>
-                  <td className="p-4 text-xs text-slate-300">
-                    {record.accel_x ?? '--'}, {record.accel_y ?? '--'}, {record.accel_z ?? '--'}
-                  </td>
-                  <td className="p-4">
-                    <span className={`inline-flex items-center justify-center rounded px-2 py-1 text-xs font-bold ${record.battery_status <= 20 ? 'bg-red-500/10 text-red-400' : 'bg-emerald-500/10 text-emerald-400'}`}>
-                      {record.battery_status}% / {record.battery_voltage ?? '--'}V
-                    </span>
-                  </td>
-                  <td className="p-4">{record.alcohol_detected ? <span className="font-bold text-red-500">Yes</span> : <span className="text-slate-500">No</span>}</td>
-                  <td className="p-4">{record.drowsiness ? <span className="font-bold text-red-500">Yes</span> : <span className="text-slate-500">No</span>}</td>
-                  <td className="p-4">{record.fall_detected ? <span className="font-bold text-red-500">Yes</span> : <span className="text-slate-500">No</span>}</td>
-                  <td className="p-4">
-                    <span className={`inline-flex rounded-full border px-3 py-1 text-xs font-semibold ${severityStyles[severity.color]}`}>
-                      Level {severity.level} {severity.label}
-                    </span>
-                  </td>
-                </tr>
-              )})}
+                  <tr key={record.id || record.timestamp} className="text-sm transition-colors hover:bg-slate-800/30">
+                    <td className="p-4 font-mono text-xs text-slate-300">{new Date(record.timestamp).toLocaleString()}</td>
+                    <td className="p-4 font-medium text-cyan-400">{record.helmet_id}</td>
+                    <td className="p-4"><SignalIndicator signal={record.signal_strength || 'MODERATE'} /></td>
+                    <td className="p-4 text-xs text-slate-300">{record.alcohol_value ?? '--'}</td>
+                    <td className="p-4 text-xs text-slate-300">{record.blink_rate ?? '--'} / {record.eye_closure_duration ?? '--'}s</td>
+                    <td className="p-4 text-xs text-slate-300">{record.accel_x ?? '--'}, {record.accel_y ?? '--'}, {record.accel_z ?? '--'}</td>
+                    <td className="p-4">
+                      <span className={`inline-flex items-center justify-center rounded px-2 py-1 text-xs font-bold ${record.battery_status <= 20 ? 'bg-red-500/10 text-red-400' : 'bg-emerald-500/10 text-emerald-400'}`}>
+                        {record.battery_status}% / {record.battery_voltage ?? '--'}V
+                      </span>
+                    </td>
+                    <td className="p-4">{record.alcohol_detected ? <span className="font-bold text-red-500">Yes</span> : <span className="text-slate-500">No</span>}</td>
+                    <td className="p-4">{record.drowsiness ? <span className="font-bold text-red-500">Yes</span> : <span className="text-slate-500">No</span>}</td>
+                    <td className="p-4">{record.fall_detected ? <span className="font-bold text-red-500">Yes</span> : <span className="text-slate-500">No</span>}</td>
+                    <td className="p-4">
+                      <span className={`inline-flex rounded-full border px-3 py-1 text-xs font-semibold ${severityStyles[severity.color]}`}>
+                        Level {severity.level} {severity.label}
+                      </span>
+                    </td>
+                  </tr>
+                );
+              })}
               {filtered.length === 0 && (
                 <tr>
-                  <td colSpan="12" className="p-8 text-center text-slate-500">No logs available for this search.</td>
+                  <td colSpan="11" className="p-8 text-center text-slate-500">No logs available for this search.</td>
                 </tr>
               )}
             </tbody>

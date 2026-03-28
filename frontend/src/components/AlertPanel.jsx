@@ -1,6 +1,12 @@
 import { AlertTriangle } from 'lucide-react';
 
 export default function AlertPanel({ alerts = [] }) {
+  const formatTimestamp = (value) => {
+    if (!value) return 'Awaiting telemetry';
+    const date = new Date(value);
+    return Number.isNaN(date.getTime()) ? 'Awaiting telemetry' : date.toLocaleString();
+  };
+
   return (
     <div className="rounded-3xl border border-slate-800 bg-slate-950/70 p-6">
       <div className="mb-5 flex items-center gap-3">
@@ -29,7 +35,7 @@ export default function AlertPanel({ alerts = [] }) {
             </div>
             <p className="mt-2 text-sm text-slate-400">{alert.message}</p>
             <p className="mt-2 text-xs text-slate-500">
-              {alert.helmet_id} • {new Date(alert.timestamp).toLocaleString()}
+              Device {alert.helmet_id} / {formatTimestamp(alert.timestamp)}
             </p>
           </div>
         ))}

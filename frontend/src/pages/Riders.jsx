@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import PageHeader from '../components/PageHeader';
 import { apiRequest } from '../services/api';
+import { useAuth } from '../hooks/useAuth';
 
 const initialForm = {
   name: '',
@@ -10,15 +11,22 @@ const initialForm = {
 };
 
 export default function Riders() {
+  const { user } = useAuth();
   const [riders, setRiders] = useState([]);
   const [form, setForm] = useState(initialForm);
   const [submitting, setSubmitting] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [feedback, setFeedback] = useState('');
+  const isAdmin = user?.role === 'admin';
 
   const loadRiders = async () => {
     try {
+      setLoading(true);
       setRiders(await apiRequest('/api/riders'));
     } catch (err) {
-      console.error(err);
+      setFeedback(err.message);
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -28,6 +36,7 @@ export default function Riders() {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    setFeedback('');
     setSubmitting(true);
     try {
       await apiRequest('/api/riders', {
@@ -36,8 +45,9 @@ export default function Riders() {
       });
       setForm(initialForm);
       await loadRiders();
+      setFeedback('Rider saved successfully.');
     } catch (err) {
-      console.error(err);
+      setFeedback(err.message);
     } finally {
       setSubmitting(false);
     }
@@ -48,11 +58,14 @@ export default function Riders() {
       <PageHeader
         eyebrow="Riders"
         title="Rider management"
-        description="Register riders, maintain emergency contacts, and prepare helmet assignment workflows."
+        description="Register riders, keep emergency contacts up to date, and keep the assignment workflow ready for live helmets."
       />
 
       <div className="grid gap-6 xl:grid-cols-[0.9fr_1.1fr]">
         <form onSubmit={handleSubmit} className="space-y-4 rounded-[2rem] border border-slate-800 bg-slate-950/70 p-6">
+          <div className="rounded-2xl border border-slate-800 bg-slate-900/70 px-4 py-3 text-sm text-slate-400">
+            {isAdmin ? 'Admin access enabled. You can add and manage riders.' : 'Monitor access detected. Rider creation is disabled for this role.'}
+          </div>
           {[
             ['name', 'Rider Name'],
             ['phone', 'Phone'],
@@ -63,19 +76,26 @@ export default function Riders() {
               <span className="mb-2 block text-sm text-slate-400">{label}</span>
               <input
                 required
+                disabled={!isAdmin}
                 value={form[key]}
                 onChange={(e) => setForm((current) => ({ ...current, [key]: e.target.value }))}
                 className="w-full rounded-2xl border border-slate-800 bg-slate-900 px-4 py-3 text-white outline-none focus:ring-2 focus:ring-cyan-400"
               />
             </label>
           ))}
-          <button type="submit" disabled={submitting} className="rounded-2xl bg-cyan-400 px-4 py-3 font-semibold text-slate-950 transition hover:brightness-110 disabled:opacity-60">
+          {feedback ? (
+            <div className="rounded-2xl border border-slate-800 bg-slate-900/70 px-4 py-3 text-sm text-slate-300">
+              {feedback}
+            </div>
+          ) : null}
+          <button type="submit" disabled={submitting || !isAdmin} className="rounded-2xl bg-cyan-400 px-4 py-3 font-semibold text-slate-950 transition hover:brightness-110 disabled:opacity-60">
             {submitting ? 'Saving...' : 'Add Rider'}
           </button>
         </form>
 
         <div className="rounded-[2rem] border border-slate-800 bg-slate-950/70 p-6">
           <div className="space-y-4">
+            {loading ? <p className="text-sm text-slate-400">Loading riders...</p> : null}
             {riders.map((rider) => (
               <div key={rider.id} className="rounded-3xl border border-slate-800 bg-slate-900/80 p-5">
                 <div className="flex items-center justify-between gap-4">
@@ -89,6 +109,7 @@ export default function Riders() {
                 <p className="text-sm text-slate-400">Emergency: {rider.emergency_contact}</p>
               </div>
             ))}
+            {!loading && riders.length === 0 ? <p className="text-sm text-slate-500">No riders registered yet.</p> : null}
           </div>
         </div>
       </div>
