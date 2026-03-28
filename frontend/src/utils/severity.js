@@ -6,10 +6,14 @@ export function getAccidentSeverity(data) {
     .map((value) => Number(value))
     .filter((value) => Number.isFinite(value));
 
-  const acceleration = accelValues.reduce((sum, value) => sum + Math.abs(value), 0);
+  const normalizedAccel = accelValues.map((value) => (Math.abs(value) > 32 ? value / 16384 : value));
+  const acceleration = normalizedAccel.length === 3
+    ? Math.sqrt(normalizedAccel.reduce((sum, value) => sum + value * value, 0))
+    : 0;
+  const accelDelta = Math.abs(acceleration - 1);
   const tiltAngle = gyroValues.length ? Math.max(...gyroValues.map((value) => Math.abs(value))) : 0;
-  const impactForce = acceleration * 18;
-  const score = acceleration + tiltAngle / 90 + impactForce / 40;
+  const impactForce = accelDelta * 10;
+  const score = impactForce + tiltAngle / 120;
 
   if (!data?.fall_detected) {
     return {
@@ -23,11 +27,11 @@ export function getAccidentSeverity(data) {
     };
   }
 
-  if (score >= 14) {
+  if (score >= 10) {
     return { level: 3, label: 'Severe', color: 'red', score, acceleration, tiltAngle, impactForce };
   }
 
-  if (score >= 8) {
+  if (score >= 5) {
     return { level: 2, label: 'Medium', color: 'yellow', score, acceleration, tiltAngle, impactForce };
   }
 

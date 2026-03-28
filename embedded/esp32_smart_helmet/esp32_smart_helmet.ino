@@ -19,13 +19,17 @@ static const unsigned long WIFI_RETRY_INTERVAL_MS = 5000;
 static const unsigned long HTTP_TIMEOUT_MS = 5000;
 static const unsigned long EMERGENCY_RETRY_COOLDOWN_MS = 1500;
 
-static const int MQ3_THRESHOLD = 2000;
-static const float FALL_ACCEL_THRESHOLD = 20000.0f;
+static const int MQ3_THRESHOLD = 2200;
+static const float FALL_ACCEL_DELTA_THRESHOLD = 0.85f;
+static const uint8_t ALCOHOL_CONFIRMATION_COUNT = 3;
+static const uint8_t FALL_CONFIRMATION_COUNT = 2;
 static const bool IR_ACTIVE_LOW = true;
 
 unsigned long lastTelemetryAt = 0;
 unsigned long lastWifiRetryAt = 0;
 unsigned long lastEmergencyTxAt = 0;
+uint8_t alcoholHitCount = 0;
+uint8_t fallHitCount = 0;
 
 int readMQ3Average() {
   long sum = 0;
@@ -47,6 +51,15 @@ float computeAccelerationMagnitude(int16_t ax, int16_t ay, int16_t az) {
     static_cast<float>(ay) * static_cast<float>(ay) +
     static_cast<float>(az) * static_cast<float>(az)
   );
+}
+
+float normalizeAcceleration(float rawValue) {
+  return fabs(rawValue) > 32.0f ? rawValue / 16384.0f : rawValue;
+}
+
+float computeAccelerationDelta(float rawMagnitude) {
+  float normalizedMagnitude = normalizeAcceleration(rawMagnitude);
+  return fabs(normalizedMagnitude - 1.0f);
 }
 
 const char* classifySignalStrength(long rssi) {
@@ -143,8 +156,8 @@ void printTelemetrySummary(
   Serial.print(ay);
   Serial.print(" | AccZ: ");
   Serial.print(az);
-  Serial.print(" | Magnitude: ");
-  Serial.print(totalAcc, 2);
+  Serial.print(" | AccDelta: ");
+  Serial.print(computeAccelerationDelta(totalAcc), 3);
   Serial.print(" | Signal: ");
   Serial.print(classifySignalStrength(rssi));
   Serial.print(" | Status: ");
@@ -236,8 +249,13 @@ void loop() {
   mpu.getMotion6(&ax, &ay, &az, &gx, &gy, &gz);
 
   float totalAcc = computeAccelerationMagnitude(ax, ay, az);
-  bool accidentDetected = totalAcc > FALL_ACCEL_THRESHOLD;
-  bool alcoholDetected = alcoholLevel > MQ3_THRESHOLD;
+  float accDelta = computeAccelerationDelta(totalAcc);
+
+  alcoholHitCount = alcoholLevel > MQ3_THRESHOLD ? min<uint8_t>(alcoholHitCount + 1, ALCOHOL_CONFIRMATION_COUNT) : 0;
+  fallHitCount = accDelta >= FALL_ACCEL_DELTA_THRESHOLD ? min<uint8_t>(fallHitCount + 1, FALL_CONFIRMATION_COUNT) : 0;
+
+  bool alcoholDetected = alcoholHitCount >= ALCOHOL_CONFIRMATION_COUNT;
+  bool accidentDetected = fallHitCount >= FALL_CONFIRMATION_COUNT;
   bool drowsinessDetected = drowsinessStatus == 0;
   bool unsafeCondition = alcoholDetected || drowsinessDetected || accidentDetected;
 

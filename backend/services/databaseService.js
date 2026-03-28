@@ -8,25 +8,49 @@ const toNumberOrNull = (value) => {
   const parsed = Number(value);
   return Number.isFinite(parsed) ? parsed : null;
 };
-const getSeverity = ({ fallDetected, accelX, accelY, accelZ, gyroX, gyroY, gyroZ }) => {
-  const acceleration = [accelX, accelY, accelZ]
-    .filter((value) => value !== null)
-    .reduce((sum, value) => sum + Math.abs(value), 0);
-  const tiltAngle = [gyroX, gyroY, gyroZ]
+const hasExplicitValue = (value) => value !== undefined && value !== null && value !== "";
+const toBooleanOrNull = (value) => {
+  if (!hasExplicitValue(value)) return null;
+  if (typeof value === "boolean") return value;
+  if (value === 1 || value === "1") return true;
+  if (value === 0 || value === "0") return false;
+  return Boolean(value);
+};
+const normalizeAcceleration = (value) => {
+  if (value === null) return null;
+  return Math.abs(value) > 32 ? value / 16384 : value;
+};
+const buildMotionProfile = (accelX, accelY, accelZ, gyroX, gyroY, gyroZ) => {
+  const normalizedAccel = [accelX, accelY, accelZ]
+    .map(normalizeAcceleration)
+    .filter((value) => value !== null);
+  const accelMagnitude = normalizedAccel.length === 3
+    ? Math.sqrt(normalizedAccel.reduce((sum, value) => sum + value * value, 0))
+    : 0;
+  const accelDelta = Math.abs(accelMagnitude - 1);
+  const maxGyro = [gyroX, gyroY, gyroZ]
     .filter((value) => value !== null)
     .reduce((max, value) => Math.max(max, Math.abs(value)), 0);
-  const impactForce = acceleration * 18;
-  const score = acceleration + tiltAngle / 90 + impactForce / 40;
+
+  return {
+    accelMagnitude,
+    accelDelta,
+    maxGyro,
+  };
+};
+const getSeverity = ({ fallDetected, accelX, accelY, accelZ, gyroX, gyroY, gyroZ }) => {
+  const motion = buildMotionProfile(accelX, accelY, accelZ, gyroX, gyroY, gyroZ);
+  const score = motion.accelDelta * 10 + motion.maxGyro / 120;
 
   if (!fallDetected) {
     return { level: 0, color: "slate", score };
   }
 
-  if (score >= 14) {
+  if (score >= 10) {
     return { level: 3, color: "red", score };
   }
 
-  if (score >= 8) {
+  if (score >= 5) {
     return { level: 2, color: "yellow", score };
   }
 
@@ -115,26 +139,30 @@ class DatabaseService {
     const gyroY = toNumberOrNull(payload.gyro_y);
     const gyroZ = toNumberOrNull(payload.gyro_z);
     const batteryVoltage = toNumberOrNull(payload.battery_voltage);
+    const explicitAlcohol = toBooleanOrNull(payload.alcohol_detected);
+    const explicitDrowsiness = toBooleanOrNull(payload.drowsiness);
+    const explicitFall = toBooleanOrNull(payload.fall_detected);
+    const motion = buildMotionProfile(accelX, accelY, accelZ, gyroX, gyroY, gyroZ);
     const batteryStatus =
       payload.battery_status !== undefined && payload.battery_status !== null
         ? Number(payload.battery_status)
         : batteryVoltage !== null
           ? Math.max(0, Math.min(100, Math.round(((batteryVoltage - 3.3) / 0.9) * 100)))
           : 100;
-    const computedAlcohol = alcoholValue !== null ? alcoholValue >= 350 : Boolean(payload.alcohol_detected);
+    const computedAlcohol =
+      explicitAlcohol !== null ? explicitAlcohol : alcoholValue !== null ? alcoholValue >= 2000 : false;
     const computedDrowsiness =
-      eyeClosureDuration !== null
+      explicitDrowsiness !== null
+        ? explicitDrowsiness
+        : eyeClosureDuration !== null
         ? eyeClosureDuration >= 2.5
         : blinkRate !== null
           ? blinkRate <= 8
-          : Boolean(payload.eye_blink_detected) || Boolean(payload.drowsiness);
-    const fallMagnitude = [accelX, accelY, accelZ]
-      .filter((value) => value !== null)
-      .reduce((sum, value) => sum + Math.abs(value), 0);
+          : Boolean(payload.eye_blink_detected);
     const computedFall =
-      fallMagnitude >= 4.8 ||
-      [gyroX, gyroY, gyroZ].filter((value) => value !== null).some((value) => Math.abs(value) >= 180) ||
-      Boolean(payload.fall_detected);
+      explicitFall !== null
+        ? explicitFall
+        : motion.accelDelta >= 0.8 || motion.maxGyro >= 180;
     const severity = getSeverity({
       fallDetected: computedFall,
       accelX,
