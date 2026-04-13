@@ -6,7 +6,20 @@ import PageHeader from '../components/PageHeader';
 import { getAccidentSeverity } from '../utils/severity';
 
 export default function LiveMonitoring() {
-  const { liveData, connectionStatus, helmetFeed } = useSocket();
+  const { liveData, connectionStatus, helmetFeed, hardwareStatus, lastTelemetryAt } = useSocket();
+
+  const hardwareTone =
+    hardwareStatus === 'CONNECTED'
+      ? 'border-emerald-500/30 bg-emerald-500/10 text-emerald-200'
+      : hardwareStatus === 'DISCONNECTED'
+        ? 'border-rose-500/30 bg-rose-500/10 text-rose-200'
+        : 'border-amber-500/30 bg-amber-500/10 text-amber-200';
+  const hardwareMessage =
+    hardwareStatus === 'CONNECTED'
+      ? 'Helmet hardware is connected and sending telemetry.'
+      : hardwareStatus === 'DISCONNECTED'
+        ? 'Helmet hardware was connected earlier, but live packets have stopped.'
+        : 'No live telemetry has been received from the helmet yet.';
 
   if (!liveData) {
     return (
@@ -20,6 +33,11 @@ export default function LiveMonitoring() {
           <p className="mx-auto max-w-md text-slate-400">
             The system is connected to the WebSocket server but has not received telemetry yet. Start the simulator or connect the ESP32 device.
           </p>
+        </div>
+        <div className={`rounded-2xl border px-5 py-4 ${hardwareTone}`}>
+          <p className="text-xs uppercase tracking-[0.24em]">Hardware Status</p>
+          <p className="mt-2 text-lg font-semibold">{hardwareStatus}</p>
+          <p className="mt-2 text-sm">{hardwareMessage}</p>
         </div>
       </div>
     );
@@ -46,10 +64,18 @@ export default function LiveMonitoring() {
       <div className="relative overflow-hidden rounded-[2rem] border border-slate-800 bg-slate-950 p-8">
         <div className={`absolute -inset-40 rounded-full opacity-10 blur-3xl transition-colors duration-1000 ${isDanger ? 'bg-red-500' : 'bg-emerald-500'}`} />
         <div className="relative z-10 grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-4">
+          <div className={`flex flex-col items-center justify-center gap-4 rounded-2xl border p-6 ${hardwareTone}`}>
+            <div className="text-center">
+              <h3 className="mb-1 font-medium">Hardware Link</h3>
+              <p className="text-xl font-bold">{hardwareStatus}</p>
+              <p className="mt-2 text-sm">
+                {lastTelemetryAt ? `Last packet ${new Date(lastTelemetryAt).toLocaleTimeString()}` : 'No telemetry yet'}
+              </p>
+            </div>
+          </div>
           <StatusIndicator title="MQ-3 Alcohol" active={liveData.alcohol_detected} />
           <StatusIndicator title="IR Drowsiness" active={liveData.drowsiness} />
           <StatusIndicator title="MPU6050 Fall" active={liveData.fall_detected} />
-
           <div className="flex flex-col items-center justify-center gap-4 rounded-2xl border border-slate-800 bg-slate-900 p-6">
             <div className="rounded-full bg-slate-950/50 p-4 shadow-inner">
               <Battery className={liveData.battery_status <= 20 ? 'text-red-500' : 'text-emerald-500'} />

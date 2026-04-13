@@ -437,6 +437,10 @@ class DatabaseService {
   async getSystemHealth() {
     const latestLogs = await this.getHistory(100);
     const activeWindowStart = Date.now() - env.healthWindowMinutes * 60 * 1000;
+    const latestEventAt = latestLogs[0]?.timestamp || null;
+    const latestEventAgeSeconds = latestEventAt
+      ? Math.max(0, Math.round((Date.now() - new Date(latestEventAt).getTime()) / 1000))
+      : null;
     const activeHelmetIds = new Set(
       latestLogs
         .filter((entry) => new Date(entry.timestamp).getTime() >= activeWindowStart)
@@ -448,7 +452,16 @@ class DatabaseService {
       database: this.isConfigured() ? "supabase" : "memory-fallback",
       activeHelmets: activeHelmetIds.size,
       trackedHelmets: (await this.listHelmets()).length,
-      latestEventAt: latestLogs[0]?.timestamp || null,
+      latestEventAt,
+      latestEventAgeSeconds,
+      hardwareConnected:
+        latestEventAgeSeconds !== null && latestEventAgeSeconds <= env.hardwareOfflineThresholdSeconds,
+      hardwareStatus:
+        latestEventAgeSeconds === null
+          ? "NO_DATA"
+          : latestEventAgeSeconds <= env.hardwareOfflineThresholdSeconds
+            ? "CONNECTED"
+            : "DISCONNECTED",
     };
   }
 }

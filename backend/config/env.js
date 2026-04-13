@@ -28,5 +28,6 @@ module.exports = {
   jwtExpiresInHours: parseNumber(process.env.JWT_EXPIRES_IN_HOURS, 12),
   lowBatteryThreshold: parseNumber(process.env.LOW_BATTERY_THRESHOLD, 20),
   healthWindowMinutes: parseNumber(process.env.HEALTH_WINDOW_MINUTES, 10),
+  hardwareOfflineThresholdSeconds: parseNumber(process.env.HARDWARE_OFFLINE_THRESHOLD_SECONDS, 15),
   deviceApiKey: process.env.DEVICE_API_KEY || "",
 };

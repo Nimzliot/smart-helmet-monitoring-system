@@ -3,6 +3,7 @@ import { io } from 'socket.io-client';
 import { socketUrl } from '../config';
 
 const SocketContext = createContext();
+const HARDWARE_OFFLINE_THRESHOLD_MS = 15000;
 
 export const useSocket = () => useContext(SocketContext);
 
@@ -13,6 +14,24 @@ export const SocketProvider = ({ children }) => {
   const [alerts, setAlerts] = useState([]);
   const [locations, setLocations] = useState({});
   const [helmetFeed, setHelmetFeed] = useState([]);
+  const [lastTelemetryAt, setLastTelemetryAt] = useState(null);
+  const [hardwareStatus, setHardwareStatus] = useState('NO_DATA');
+
+  useEffect(() => {
+    const updateHardwareStatus = () => {
+      if (!lastTelemetryAt) {
+        setHardwareStatus('NO_DATA');
+        return;
+      }
+
+      const age = Date.now() - new Date(lastTelemetryAt).getTime();
+      setHardwareStatus(age <= HARDWARE_OFFLINE_THRESHOLD_MS ? 'CONNECTED' : 'DISCONNECTED');
+    };
+
+    updateHardwareStatus();
+    const interval = window.setInterval(updateHardwareStatus, 1000);
+    return () => window.clearInterval(interval);
+  }, [lastTelemetryAt]);
 
   useEffect(() => {
     const newSocket = io(socketUrl, {
@@ -32,10 +51,12 @@ export const SocketProvider = ({ children }) => {
 
     newSocket.on('helmet-update', (data) => {
       setLiveData(data);
+      setLastTelemetryAt(data?.timestamp || new Date().toISOString());
     });
 
     newSocket.on('helmet:update', ({ record }) => {
       setLiveData(record);
+      setLastTelemetryAt(record?.timestamp || new Date().toISOString());
       setHelmetFeed((current) => [record, ...current.filter((item) => item.helmet_id !== record.helmet_id)].slice(0, 10));
     });
 
@@ -62,11 +83,13 @@ export const SocketProvider = ({ children }) => {
       socket,
       liveData,
       connectionStatus,
+      hardwareStatus,
+      lastTelemetryAt,
       alerts,
       locations,
       helmetFeed,
     }),
-    [alerts, connectionStatus, helmetFeed, liveData, locations, socket]
+    [alerts, connectionStatus, hardwareStatus, helmetFeed, lastTelemetryAt, liveData, locations, socket]
   );
 
   return <SocketContext.Provider value={value}>{children}</SocketContext.Provider>;

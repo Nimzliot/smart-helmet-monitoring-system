@@ -35,6 +35,14 @@ unsigned long lastSend = 0;
 unsigned long lastWifiTry = 0;
 unsigned long lastEmergency = 0;
 
+const char* getSignalStrengthLabel() {
+  long rssi = WiFi.RSSI();
+
+  if (rssi >= -60) return "STRONG";
+  if (rssi >= -75) return "MODERATE";
+  return "WEAK";
+}
+
 // ---------- MQ-3 Averaging ----------
 int readMQ3() {
   long sum = 0;
@@ -91,6 +99,8 @@ void sendData(int alcohol, int eye, int accident, int16_t ax, int16_t ay, int16_
   doc["alcohol_level"] = alcohol;
   doc["drowsiness_status"] = eye;
   doc["accident_detected"] = accident;
+  doc["communication_mode"] = "ESP32_HTTP";
+  doc["signal_strength"] = getSignalStrengthLabel();
 
   JsonObject acc = doc.createNestedObject("acceleration");
   acc["x"] = ax;

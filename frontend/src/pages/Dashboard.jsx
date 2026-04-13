@@ -13,7 +13,7 @@ export default function Dashboard() {
   const [snapshot, setSnapshot] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
-  const { liveData, alerts, connectionStatus, helmetFeed } = useSocket();
+  const { liveData, alerts, connectionStatus, helmetFeed, hardwareStatus, lastTelemetryAt } = useSocket();
 
   useEffect(() => {
     const load = async () => {
@@ -72,6 +72,22 @@ export default function Dashboard() {
     red: 'border-rose-500/30 bg-rose-500/10 text-rose-200',
     slate: 'border-slate-700 bg-slate-900/70 text-slate-300',
   };
+  const backendHardwareStatus = snapshot.systemHealth.hardwareStatus || 'NO_DATA';
+  const displayHardwareStatus = hardwareStatus === 'NO_DATA' ? backendHardwareStatus : hardwareStatus;
+  const hardwareConnected = displayHardwareStatus === 'CONNECTED';
+  const hardwareLastSeen = lastTelemetryAt || snapshot.systemHealth.latestEventAt;
+  const hardwareTone =
+    displayHardwareStatus === 'CONNECTED'
+      ? 'bg-emerald-500/10 text-emerald-200'
+      : displayHardwareStatus === 'DISCONNECTED'
+        ? 'bg-rose-500/10 text-rose-200'
+        : 'bg-amber-500/10 text-amber-200';
+  const hardwareLabel =
+    displayHardwareStatus === 'CONNECTED'
+      ? 'HARDWARE CONNECTED'
+      : displayHardwareStatus === 'DISCONNECTED'
+        ? 'HARDWARE DISCONNECTED'
+        : 'WAITING FOR HARDWARE';
 
   return (
     <div className="space-y-8">
@@ -101,10 +117,18 @@ export default function Dashboard() {
               <p className="text-xs uppercase tracking-[0.3em] text-cyan-300">Live Device</p>
               <h2 className="mt-2 text-2xl font-semibold text-white">{status.helmet_id || 'Awaiting Device Data'}</h2>
               <p className="mt-2 text-sm text-slate-400">Last update {lastUpdateText}</p>
+              <p className="mt-2 text-sm text-slate-500">
+                Hardware {hardwareConnected ? 'is sending live packets.' : displayHardwareStatus === 'DISCONNECTED' ? 'has stopped sending packets.' : 'has not sent telemetry yet.'}
+              </p>
             </div>
-            <span className={`rounded-full px-4 py-2 text-xs font-semibold tracking-[0.28em] ${criticalState ? 'bg-rose-500/10 text-rose-200' : 'bg-emerald-500/10 text-emerald-200'}`}>
-              {hasTelemetry ? (criticalState ? 'RISK DETECTED' : 'RIDER SAFE') : 'NO LIVE DATA'}
-            </span>
+            <div className="flex flex-col items-end gap-2">
+              <span className={`rounded-full px-4 py-2 text-xs font-semibold tracking-[0.28em] ${hardwareTone}`}>
+                {hardwareLabel}
+              </span>
+              <span className={`rounded-full px-4 py-2 text-xs font-semibold tracking-[0.28em] ${criticalState ? 'bg-rose-500/10 text-rose-200' : 'bg-emerald-500/10 text-emerald-200'}`}>
+                {hasTelemetry ? (criticalState ? 'RISK DETECTED' : 'RIDER SAFE') : 'NO LIVE DATA'}
+              </span>
+            </div>
           </div>
 
           {!hasTelemetry ? (
@@ -252,6 +276,8 @@ export default function Dashboard() {
                 ['Backend API', snapshot.systemHealth.server],
                 ['Database', snapshot.systemHealth.database],
                 ['Socket Link', connectionStatus],
+                ['Hardware', displayHardwareStatus],
+                ['Last Hardware Seen', hardwareLastSeen ? new Date(hardwareLastSeen).toLocaleString() : 'No telemetry yet'],
               ].map(([label, value]) => (
                 <div key={label} className="flex items-center justify-between rounded-2xl border border-slate-800 bg-slate-900/80 px-4 py-3">
                   <p className="text-sm text-slate-400">{label}</p>
