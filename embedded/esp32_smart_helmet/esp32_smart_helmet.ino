@@ -9,7 +9,7 @@
 // ---------- WiFi + Server ----------
 #define WIFI_SSID "Smart Helmet"
 #define WIFI_PASSWORD "87654321"
-#define SERVER_URL "http://10.18.149.160:5000/api/helmet-data"
+#define SERVER_URL "https://smart-helmet-monitoring-system.onrender.com/api/helmet-data"
 
 #define DEVICE_ID "HELMET_001"
 #define DEVICE_API_KEY ""   // put key if required
