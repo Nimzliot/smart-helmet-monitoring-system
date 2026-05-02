@@ -78,7 +78,9 @@ const sendFast2Sms = async ({ message, numbers }) => {
 
 const notifyEmergencyContact = async ({ helmetId, helmet, rider, location, record }) => {
   const mapLink = buildMapLink(location);
+  const configuredFast2SmsNumber = normalizePhoneNumber(env.fast2smsNumber);
   const normalizedEmergencyContact = normalizePhoneNumber(rider?.emergency_contact);
+  const smsRecipient = configuredFast2SmsNumber || normalizedEmergencyContact;
   const message = buildSmsMessage({
     helmetId,
     rider,
@@ -89,14 +91,14 @@ const notifyEmergencyContact = async ({ helmetId, helmet, rider, location, recor
 
   logger.warn(
     `Emergency event stored for ${helmetId}. ` +
-      `Contact ${normalizedEmergencyContact || "N/A"} | ${mapLink || "Map unavailable"} | ` +
+      `Contact ${smsRecipient || "N/A"} | ${mapLink || "Map unavailable"} | ` +
       `ESP/GSM flow remains active${env.fast2smsApiKey ? " and backend Fast2SMS will be attempted." : "."}`
   );
 
   try {
     const smsResult = await sendFast2Sms({
       message,
-      numbers: normalizedEmergencyContact ? [normalizedEmergencyContact] : [],
+      numbers: smsRecipient ? [smsRecipient] : [],
     });
 
     if (smsResult?.skipped) {

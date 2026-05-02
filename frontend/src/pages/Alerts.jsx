@@ -6,6 +6,7 @@ import PageHeader from '../components/PageHeader';
 import { getAccidentSeverity } from '../utils/severity';
 
 export default function Alerts() {
+  const configuredFast2SmsNumber = import.meta.env.VITE_FAST2SMS_NUMBER || '';
   const [alerts, setAlerts] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -76,8 +77,7 @@ export default function Alerts() {
                         <p>Severity Level: {getAccidentSeverity(liveData || {}).level || 3}</p>
                         <p>Location: {liveData?.latitude ?? '--'}, {liveData?.longitude ?? '--'}</p>
                         <p>SMS sent to:</p>
-                        <p>- Emergency Contact</p>
-                        <p>- Ambulance Service (108)</p>
+                        <p>- Fast2SMS Number: {configuredFast2SmsNumber || 'Not configured'}</p>
                       </div>
                     ) : null}
                     <p className="mt-1 flex items-center gap-1 text-sm text-slate-500">
