@@ -287,7 +287,7 @@ BEGIN
 
   IF user_id_type = 'uuid' THEN
     INSERT INTO public.users (id, name, email, password, role)
-    VALUES (gen_random_uuid(), 'Admin', 'admin@smarthelmet.local', 'admin123', 'admin')
+    VALUES (gen_random_uuid(), 'Admin', 'admin@gmail.com', 'admin', 'admin')
     ON CONFLICT (email) DO UPDATE
     SET
       name = EXCLUDED.name,
@@ -295,7 +295,7 @@ BEGIN
       role = EXCLUDED.role;
   ELSE
     INSERT INTO public.users (id, name, email, password, role)
-    VALUES ('U001', 'Admin', 'admin@smarthelmet.local', 'admin123', 'admin')
+    VALUES ('U001', 'Admin', 'admin@gmail.com', 'admin', 'admin')
     ON CONFLICT (email) DO UPDATE
     SET
       name = EXCLUDED.name,

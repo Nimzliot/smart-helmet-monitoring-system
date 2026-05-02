@@ -138,8 +138,8 @@ class DatabaseService {
       {
         id: "U001",
         name: "Admin",
-        email: "admin@smarthelmet.local",
-        password: "admin123",
+        email: "admin@gmail.com",
+        password: "admin",
         role: "admin",
       },
     ];
