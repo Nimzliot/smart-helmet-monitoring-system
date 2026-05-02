@@ -34,6 +34,7 @@ const getAccidentSeverity = (record) => {
 
 const createAlertsFromRecord = async (record) => {
   const alerts = [];
+  const hasEmergency = Boolean(record.alcohol_detected || record.drowsiness || record.fall_detected);
 
   if (record.alcohol_detected) {
     alerts.push(
@@ -64,7 +65,7 @@ const createAlertsFromRecord = async (record) => {
         record,
         "FALL_DETECTED",
         "CRITICAL",
-        `MPU6050 detected sudden acceleration or tilt consistent with a fall/accident. Severity Level ${accidentSeverity.level} - ${accidentSeverity.label}. Location: ${record.latitude ?? "--"}, ${record.longitude ?? "--"}. SMS sent to emergency contact and ambulance service (108).`
+        `MPU6050 detected sudden acceleration or tilt consistent with a fall/accident. Severity Level ${accidentSeverity.level} - ${accidentSeverity.label}. Location: ${record.latitude ?? "--"}, ${record.longitude ?? "--"}.`
       )
     );
   }
@@ -81,15 +82,18 @@ const createAlertsFromRecord = async (record) => {
 
   const storedAlerts = await db.createAlerts(alerts);
 
-  if (record.fall_detected) {
-    const rider = db.findRiderByHelmet(record.helmet_id);
-    notifyEmergencyContact({
+  if (hasEmergency) {
+    const rider = await db.findRiderByHelmet(record.helmet_id);
+    const helmet = await db.findHelmetById(record.helmet_id);
+    await notifyEmergencyContact({
       helmetId: record.helmet_id,
+      helmet,
       rider,
       location: {
         latitude: record.latitude,
         longitude: record.longitude,
       },
+      record,
     });
   }
 

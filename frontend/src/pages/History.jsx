@@ -4,6 +4,7 @@ import { apiRequest } from '../services/api';
 import SignalIndicator from '../components/SignalIndicator';
 import PageHeader from '../components/PageHeader';
 import { getAccidentSeverity } from '../utils/severity';
+import { formatCoordinate, formatSignalDbm, formatSpeed } from '../utils/telemetry';
 
 export default function History() {
   const [history, setHistory] = useState([]);
@@ -33,8 +34,6 @@ export default function History() {
 
   const filtered = history.filter((record) => record.helmet_id.toLowerCase().includes(query.toLowerCase()));
   const severityStyles = {
-    green: 'bg-emerald-500/10 text-emerald-300 border-emerald-500/20',
-    yellow: 'bg-amber-500/10 text-amber-300 border-amber-500/20',
     red: 'bg-rose-500/10 text-rose-300 border-rose-500/20',
     slate: 'bg-slate-800 text-slate-300 border-slate-700',
   };
@@ -66,6 +65,8 @@ export default function History() {
                 <th className="p-4 font-medium">Time</th>
                 <th className="p-4 font-medium">Device</th>
                 <th className="p-4 font-medium">Signal</th>
+                <th className="p-4 font-medium">Network / GSM</th>
+                <th className="p-4 font-medium">GPS</th>
                 <th className="p-4 font-medium">MQ-3</th>
                 <th className="p-4 font-medium">Eye Blink</th>
                 <th className="p-4 font-medium">MPU6050</th>
@@ -81,11 +82,9 @@ export default function History() {
                 const severity = record.severity_level != null
                   ? {
                       level: record.severity_level,
-                      color: record.severity_color || 'slate',
+                      color: record.severity_level > 0 ? 'red' : 'slate',
                       label:
-                        record.severity_level === 3 ? 'Severe' :
-                        record.severity_level === 2 ? 'Medium' :
-                        record.severity_level === 1 ? 'Minor' : 'No accident',
+                        record.severity_level > 0 ? 'Accident' : 'No accident',
                     }
                   : getAccidentSeverity(record);
 
@@ -94,6 +93,15 @@ export default function History() {
                     <td className="p-4 font-mono text-xs text-slate-300">{new Date(record.timestamp).toLocaleString()}</td>
                     <td className="p-4 font-medium text-cyan-400">{record.helmet_id}</td>
                     <td className="p-4"><SignalIndicator signal={record.signal_strength || 'MODERATE'} /></td>
+                    <td className="p-4 text-xs text-slate-300">
+                      {record.gsm_operator || '--'} / {record.gsm_network || 'GSM900'} / {formatSignalDbm(record.gsm_signal_dbm)}
+                    </td>
+                    <td className="p-4 text-xs text-slate-300">
+                      {record.gps_fix ? 'Fix' : 'No fix'} / {record.gps_satellites ?? '--'} sats / {formatSpeed(record.gps_speed)}
+                      <div className="mt-1 text-slate-500">
+                        {formatCoordinate(record.latitude)}, {formatCoordinate(record.longitude)}
+                      </div>
+                    </td>
                     <td className="p-4 text-xs text-slate-300">{record.alcohol_value ?? '--'}</td>
                     <td className="p-4 text-xs text-slate-300">{record.blink_rate ?? '--'} / {record.eye_closure_duration ?? '--'}s</td>
                     <td className="p-4 text-xs text-slate-300">{record.accel_x ?? '--'}, {record.accel_y ?? '--'}, {record.accel_z ?? '--'}</td>
@@ -115,7 +123,7 @@ export default function History() {
               })}
               {filtered.length === 0 && (
                 <tr>
-                  <td colSpan="11" className="p-8 text-center text-slate-500">No logs available for this search.</td>
+                  <td colSpan="13" className="p-8 text-center text-slate-500">No logs available for this search.</td>
                 </tr>
               )}
             </tbody>

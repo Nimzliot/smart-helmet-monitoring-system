@@ -24,7 +24,9 @@ export default function Settings() {
           <div className="mt-4 space-y-3 text-sm text-slate-400">
             <p>Backend URL: <span className="text-slate-200">{backendBaseUrl}</span></p>
             <p>JWT login enabled for the admin dashboard.</p>
-            <p>Supabase remains optional because the app can fall back to in-memory data for demos.</p>
+            <p>Supabase is required and is used as the source of truth for runtime data.</p>
+            <p>Telemetry pipeline is prepared for Wi-Fi HTTP posting from ESP32, plus GSM/GPS metadata and emergency SMS support.</p>
+            <p>Helmet heartbeat is derived from telemetry packets and is marked offline if packets stop for too long.</p>
           </div>
         </div>
 

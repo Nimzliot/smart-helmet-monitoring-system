@@ -15,6 +15,7 @@ export const SocketProvider = ({ children }) => {
   const [locations, setLocations] = useState({});
   const [helmetFeed, setHelmetFeed] = useState([]);
   const [lastTelemetryAt, setLastTelemetryAt] = useState(null);
+  const [lastHeartbeat, setLastHeartbeat] = useState(null);
   const [hardwareStatus, setHardwareStatus] = useState('NO_DATA');
 
   useEffect(() => {
@@ -57,7 +58,17 @@ export const SocketProvider = ({ children }) => {
     newSocket.on('helmet:update', ({ record }) => {
       setLiveData(record);
       setLastTelemetryAt(record?.timestamp || new Date().toISOString());
+      setLastHeartbeat({
+        helmet_id: record?.helmet_id,
+        timestamp: record?.timestamp || new Date().toISOString(),
+        communication_mode: record?.communication_mode || 'HTTP',
+      });
       setHelmetFeed((current) => [record, ...current.filter((item) => item.helmet_id !== record.helmet_id)].slice(0, 10));
+    });
+
+    newSocket.on('helmet:heartbeat', (heartbeat) => {
+      setLastTelemetryAt(heartbeat?.timestamp || new Date().toISOString());
+      setLastHeartbeat(heartbeat || null);
     });
 
     newSocket.on('alert:new', (alert) => {
@@ -85,11 +96,12 @@ export const SocketProvider = ({ children }) => {
       connectionStatus,
       hardwareStatus,
       lastTelemetryAt,
+      lastHeartbeat,
       alerts,
       locations,
       helmetFeed,
     }),
-    [alerts, connectionStatus, hardwareStatus, helmetFeed, lastTelemetryAt, liveData, locations, socket]
+    [alerts, connectionStatus, hardwareStatus, helmetFeed, lastHeartbeat, lastTelemetryAt, liveData, locations, socket]
   );
 
   return <SocketContext.Provider value={value}>{children}</SocketContext.Provider>;

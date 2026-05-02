@@ -1,49 +1,132 @@
-#include <WiFi.h>
-#include <HTTPClient.h>
-#include <Wire.h>
 #include <ArduinoJson.h>
+#include <HardwareSerial.h>
+#include <HTTPClient.h>
 #include <MPU6050.h>
+#include <TinyGPSPlus.h>
+#include <WiFi.h>
+#include <Wire.h>
 #include <math.h>
-#include <string.h>
 
-// ---------- WiFi + Server ----------
-#define WIFI_SSID "Smart Helmet"
-#define WIFI_PASSWORD "87654321"
-#define SERVER_URL "https://smart-helmet-monitoring-system.onrender.com/api/helmet-data"
+#define SERVER_URL "http://192.168.1.10:5000/api/helmet-data"
+#define DEVICE_ID "H001"
+#define DEVICE_API_KEY "smart-detection-system"
+#define DEFAULT_LATITUDE 12.65068910917473
+#define DEFAULT_LONGITUDE 78.60467542494665
+#define WIFI_SSID "your_wifi_name"
+#define WIFI_PASSWORD "your_wifi_password"
 
-#define DEVICE_ID "HELMET_001"
-#define DEVICE_API_KEY ""   // put key if required
+#define GSM_RX_PIN 16
+#define GSM_TX_PIN 17
+#define GPS_RX_PIN 4
+#define GPS_TX_PIN 2
+#define GSM_BAUD 9600
+#define GPS_BAUD 9600
 
-// ---------- Pins ----------
+#define GSM_APN "your_apn"
+#define EMERGENCY_NUMBER "+919999999999"
+
 #define MQ3_PIN 34
 #define IR_PIN 27
 #define BUZZER_PIN 25
 
-// ---------- Timing ----------
 #define NORMAL_INTERVAL 5000
-#define WIFI_RETRY 5000
-#define HTTP_TIMEOUT 5000
-#define EMERGENCY_INTERVAL 1500
+#define SMS_COOLDOWN 30000
+#define GSM_RETRY_INTERVAL 5000
+#define WIFI_RETRY_INTERVAL 5000
 
-// ---------- Thresholds ----------
 #define MQ3_THRESHOLD 2000
 #define FALL_THRESHOLD 20000
 
+HardwareSerial gsmSerial(1);
+HardwareSerial gpsSerial(2);
+TinyGPSPlus gps;
 MPU6050 mpu;
 
 unsigned long lastSend = 0;
-unsigned long lastWifiTry = 0;
-unsigned long lastEmergency = 0;
+unsigned long lastSmsAt = 0;
+unsigned long lastGsmInitAttempt = 0;
+unsigned long lastWifiAttempt = 0;
 
-const char* getSignalStrengthLabel() {
-  long rssi = WiFi.RSSI();
+bool gsmReady = false;
+String lastSmsType = "";
 
-  if (rssi >= -60) return "STRONG";
-  if (rssi >= -75) return "MODERATE";
-  return "WEAK";
+struct GpsData {
+  bool fix;
+  double latitude;
+  double longitude;
+};
+
+String readResponse(unsigned long timeoutMs) {
+  String response = "";
+  unsigned long start = millis();
+
+  while (millis() - start < timeoutMs) {
+    while (gsmSerial.available()) {
+      response += (char)gsmSerial.read();
+    }
+  }
+
+  response.trim();
+  return response;
 }
 
-// ---------- MQ-3 Averaging ----------
+bool sendAT(const String& command, const char* expected, unsigned long timeoutMs) {
+  gsmSerial.println(command);
+  String response = readResponse(timeoutMs);
+  Serial.println("GSM << " + command);
+  Serial.println("GSM >> " + response);
+  return response.indexOf(expected) >= 0;
+}
+
+void ensureWifiConnected() {
+  if (WiFi.status() == WL_CONNECTED) return;
+  if (millis() - lastWifiAttempt < WIFI_RETRY_INTERVAL) return;
+
+  lastWifiAttempt = millis();
+  WiFi.disconnect(true, true);
+  WiFi.mode(WIFI_STA);
+  WiFi.begin(WIFI_SSID, WIFI_PASSWORD);
+
+  Serial.println("WiFi connecting...");
+
+  unsigned long startedAt = millis();
+  while (WiFi.status() != WL_CONNECTED && millis() - startedAt < 10000) {
+    delay(250);
+    Serial.print(".");
+  }
+  Serial.println();
+
+  if (WiFi.status() == WL_CONNECTED) {
+    Serial.print("WiFi connected. IP: ");
+    Serial.println(WiFi.localIP());
+  } else {
+    Serial.println("WiFi not connected");
+  }
+}
+
+bool initGsm() {
+  if (gsmReady) return true;
+  if (millis() - lastGsmInitAttempt < GSM_RETRY_INTERVAL) return false;
+
+  lastGsmInitAttempt = millis();
+
+  gsmReady =
+    sendAT("AT", "OK", 2000) &&
+    sendAT("ATE0", "OK", 2000) &&
+    sendAT("AT+CMGF=1", "OK", 2000) &&
+    sendAT("AT+SAPBR=3,1,\"Contype\",\"GPRS\"", "OK", 3000) &&
+    sendAT(String("AT+SAPBR=3,1,\"APN\",\"") + GSM_APN + "\"", "OK", 3000);
+
+  if (gsmReady) {
+    bool bearerOpen = sendAT("AT+SAPBR=1,1", "OK", 10000);
+    bool bearerAvailable = sendAT("AT+SAPBR=2,1", "+SAPBR:", 5000);
+    gsmReady = bearerOpen || bearerAvailable;
+  }
+
+  Serial.println(gsmReady ? "GSM READY" : "GSM NOT READY");
+  return gsmReady;
+}
+
 int readMQ3() {
   long sum = 0;
   for (int i = 0; i < 10; i++) {
@@ -53,81 +136,141 @@ int readMQ3() {
   return sum / 10;
 }
 
-// ---------- Eye Detection ----------
 bool isEyeClosed() {
-  return digitalRead(IR_PIN) == LOW; // active LOW
+  return digitalRead(IR_PIN) == LOW;
 }
 
-// ---------- Acceleration ----------
 float getAccelMag(int16_t ax, int16_t ay, int16_t az) {
   return sqrt((float)ax * ax + (float)ay * ay + (float)az * az);
 }
 
-// ---------- WiFi Reconnect ----------
-void reconnectWiFi() {
-  if (WiFi.status() == WL_CONNECTED) return;
-
-  if (millis() - lastWifiTry < WIFI_RETRY) return;
-
-  lastWifiTry = millis();
-  Serial.println("Reconnecting WiFi...");
-  WiFi.begin(WIFI_SSID, WIFI_PASSWORD);
+void updateGps() {
+  while (gpsSerial.available()) {
+    gps.encode(gpsSerial.read());
+  }
 }
 
-// ---------- Send Data ----------
-void sendData(int alcohol, int eye, int accident, int16_t ax, int16_t ay, int16_t az) {
+GpsData getGpsData() {
+  GpsData data;
+  data.fix = gps.location.isValid();
+  data.latitude = data.fix ? gps.location.lat() : DEFAULT_LATITUDE;
+  data.longitude = data.fix ? gps.location.lng() : DEFAULT_LONGITUDE;
+  return data;
+}
 
-  if (WiFi.status() != WL_CONNECTED) {
-    Serial.println("WiFi not connected. Skipping POST.");
-    return;
+String getAlertType(bool alcoholDetected, bool drowsinessDetected, bool fallDetected) {
+  int count = (int)alcoholDetected + (int)drowsinessDetected + (int)fallDetected;
+
+  if (count == 0) return "";
+  if (count == 3) return "ALL_3";
+  if (count == 2) return "ANY_2";
+  if (alcoholDetected) return "ALCOHOL";
+  if (drowsinessDetected) return "DROWSINESS";
+  return "FALL";
+}
+
+String buildSmsMessage(const String& alertType, const GpsData& gpsData) {
+  String locationText =
+    " Location: https://maps.google.com/?q=" + String(gpsData.latitude, 6) + "," + String(gpsData.longitude, 6);
+
+  if (!gpsData.fix) {
+    locationText += " (default fallback)";
   }
 
-  HTTPClient http;
-  http.begin(SERVER_URL);
-  http.setTimeout(HTTP_TIMEOUT);
-
-  http.addHeader("Content-Type", "application/json");
-
-  // ✅ Device key header
-  if (strlen(DEVICE_API_KEY) > 0) {
-    http.addHeader("x-device-key", DEVICE_API_KEY);
+  if (alertType == "ALCOHOL") {
+    return "Smart Helmet Alert: Alcohol detected." + locationText;
   }
+
+  if (alertType == "DROWSINESS") {
+    return "Smart Helmet Alert: Drowsiness detected." + locationText;
+  }
+
+  if (alertType == "FALL") {
+    return "Smart Helmet Alert: Fall detected." + locationText;
+  }
+
+  if (alertType == "ANY_2") {
+    return "Smart Helmet Alert: Two dangers detected together." + locationText;
+  }
+
+  return "Smart Helmet Critical Alert: Alcohol, drowsiness, and fall detected." + locationText;
+}
+
+bool sendSms(const String& message) {
+  if (!initGsm()) return false;
+  if (!sendAT("AT+CMGF=1", "OK", 2000)) return false;
+
+  gsmSerial.print("AT+CMGS=\"");
+  gsmSerial.print(EMERGENCY_NUMBER);
+  gsmSerial.println("\"");
+
+  if (readResponse(3000).indexOf(">") < 0) return false;
+
+  gsmSerial.print(message);
+  gsmSerial.write(26);
+
+  String response = readResponse(10000);
+  Serial.println("SMS >> " + response);
+  return response.indexOf("OK") >= 0 || response.indexOf("+CMGS:") >= 0;
+}
+
+void maybeSendEmergencySms(bool alcoholDetected, bool drowsinessDetected, bool fallDetected, const GpsData& gpsData) {
+  String alertType = getAlertType(alcoholDetected, drowsinessDetected, fallDetected);
+  if (alertType.length() == 0) return;
+
+  unsigned long now = millis();
+  if (alertType == lastSmsType && now - lastSmsAt < SMS_COOLDOWN) return;
+
+  String message = buildSmsMessage(alertType, gpsData);
+  if (sendSms(message)) {
+    lastSmsType = alertType;
+    lastSmsAt = now;
+    Serial.println("Emergency SMS sent");
+  } else {
+    Serial.println("Emergency SMS failed");
+  }
+}
+
+bool postTelemetry(bool alcoholDetected, bool drowsinessDetected, bool fallDetected, int alcoholValue, const GpsData& gpsData) {
+  ensureWifiConnected();
+  if (WiFi.status() != WL_CONNECTED) return false;
 
   StaticJsonDocument<256> doc;
-
   doc["device_id"] = DEVICE_ID;
-  doc["alcohol_level"] = alcohol;
-  doc["drowsiness_status"] = eye;
-  doc["accident_detected"] = accident;
-  doc["communication_mode"] = "ESP32_HTTP";
-  doc["signal_strength"] = getSignalStrengthLabel();
+  doc["alcohol_level"] = alcoholValue;
+  doc["alcohol_detected"] = alcoholDetected;
+  doc["drowsiness"] = drowsinessDetected;
+  doc["fall_detected"] = fallDetected;
+  doc["communication_mode"] = "WIFI_HTTP";
 
-  JsonObject acc = doc.createNestedObject("acceleration");
-  acc["x"] = ax;
-  acc["y"] = ay;
-  acc["z"] = az;
-
-  // ❌ timestamp removed (backend handles it)
+  doc["latitude"] = gpsData.latitude;
+  doc["longitude"] = gpsData.longitude;
+  doc["gps_fix"] = gpsData.fix;
+  doc["signal_strength"] =
+    WiFi.RSSI() >= -67 ? "STRONG" : WiFi.RSSI() >= -80 ? "MODERATE" : "WEAK";
+  doc["battery_status"] = 100;
 
   String json;
   serializeJson(doc, json);
 
-  int code = http.POST(json);
-
-  Serial.print("HTTP Response Code: ");
-  Serial.println(code);
-
-  if (code > 0) {
-    Serial.println(http.getString());
-  } else {
-    Serial.print("HTTP Error: ");
-    Serial.println(http.errorToString(code));
+  HTTPClient http;
+  http.begin(SERVER_URL);
+  http.addHeader("Content-Type", "application/json");
+  if (strlen(DEVICE_API_KEY) > 0) {
+    http.addHeader("x-device-key", DEVICE_API_KEY);
   }
 
+  int responseCode = http.POST(json);
+  String responseBody = http.getString();
   http.end();
+
+  Serial.print("HTTP POST -> ");
+  Serial.println(responseCode);
+  Serial.println(responseBody);
+
+  return responseCode == 200 || responseCode == 201;
 }
 
-// ---------- Setup ----------
 void setup() {
   Serial.begin(115200);
 
@@ -138,55 +281,50 @@ void setup() {
   Wire.begin(21, 22);
   mpu.initialize();
 
-  if (!mpu.testConnection()) {
-    Serial.println("MPU6050 NOT CONNECTED!");
-  } else {
-    Serial.println("MPU6050 READY");
-  }
+  gsmSerial.begin(GSM_BAUD, SERIAL_8N1, GSM_RX_PIN, GSM_TX_PIN);
+  gpsSerial.begin(GPS_BAUD, SERIAL_8N1, GPS_RX_PIN, GPS_TX_PIN);
+  WiFi.mode(WIFI_STA);
+  ensureWifiConnected();
 
-  WiFi.begin(WIFI_SSID, WIFI_PASSWORD);
-
-  Serial.println("SMART HELMET SYSTEM STARTED");
+  Serial.println(mpu.testConnection() ? "MPU6050 READY" : "MPU6050 NOT CONNECTED");
+  Serial.println("SMART HELMET STARTED");
 }
 
-// ---------- Loop ----------
 void loop() {
+  updateGps();
+  initGsm();
+  ensureWifiConnected();
 
-  reconnectWiFi();
-
-  int alcohol = readMQ3();
-  int eyeStatus = isEyeClosed() ? 0 : 1;
+  int alcoholValue = readMQ3();
+  bool alcoholDetected = alcoholValue > MQ3_THRESHOLD;
+  bool drowsinessDetected = isEyeClosed();
 
   int16_t ax, ay, az, gx, gy, gz;
   mpu.getMotion6(&ax, &ay, &az, &gx, &gy, &gz);
+  bool fallDetected = getAccelMag(ax, ay, az) > FALL_THRESHOLD;
 
-  float acc = getAccelMag(ax, ay, az);
-  int accident = (acc > FALL_THRESHOLD) ? 1 : 0;
-
-  bool unsafe = (alcohol > MQ3_THRESHOLD) || (eyeStatus == 0) || accident;
-
+  GpsData gpsData = getGpsData();
+  bool unsafe = alcoholDetected || drowsinessDetected || fallDetected;
   digitalWrite(BUZZER_PIN, unsafe ? HIGH : LOW);
 
-  Serial.print("Alcohol: ");
-  Serial.print(alcohol);
-  Serial.print(" | Eye: ");
-  Serial.print(eyeStatus);
-  Serial.print(" | Acc: ");
-  Serial.print(acc);
-  Serial.print(" | Status: ");
-  Serial.println(unsafe ? "UNSAFE" : "SAFE");
+  Serial.print("Alcohol=");
+  Serial.print(alcoholDetected);
+  Serial.print(" Drowsy=");
+  Serial.print(drowsinessDetected);
+  Serial.print(" Fall=");
+  Serial.print(fallDetected);
+  Serial.print(" GPS=");
+  Serial.println(gpsData.fix ? "OK" : "NO FIX");
+  Serial.print("WiFi=");
+  Serial.println(WiFi.status() == WL_CONNECTED ? "CONNECTED" : "DISCONNECTED");
 
-  unsigned long now = millis();
+  maybeSendEmergencySms(alcoholDetected, drowsinessDetected, fallDetected, gpsData);
 
-  bool normal = (now - lastSend > NORMAL_INTERVAL);
-  bool emergency = unsafe && (now - lastEmergency > EMERGENCY_INTERVAL);
-
-  if (normal || emergency) {
-    sendData(alcohol, eyeStatus, accident, ax, ay, az);
-
-    lastSend = now;
-    if (unsafe) lastEmergency = now;
+  if (millis() - lastSend >= NORMAL_INTERVAL) {
+    if (postTelemetry(alcoholDetected, drowsinessDetected, fallDetected, alcoholValue, gpsData)) {
+      lastSend = millis();
+    }
   }
 
-  delay(100);
+  delay(200);
 }

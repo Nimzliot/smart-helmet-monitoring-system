@@ -6,8 +6,6 @@ This folder contains the ESP32 firmware scaffold for integrating the Smart Helme
 
 - `esp32_smart_helmet/esp32_smart_helmet.ino`
   Main Arduino sketch aligned to the hardware team data specification for ESP32 + MQ-3 + IR eye blink sensor + MPU6050 + buzzer.
-- `esp32_smart_helmet/secrets.example.h`
-  Copy this to `secrets.h` and fill in your Wi-Fi and backend details before flashing.
 
 ## Supported Hardware
 
@@ -43,43 +41,42 @@ Do not use `localhost` in ESP32 firmware. Use the laptop or server IP that the E
 
 ## Payload Sent By The ESP32
 
-The firmware sends telemetry in the hardware team's exact JSON format:
+The firmware posts JSON over Wi-Fi to the backend. Current payload shape:
 
 ```json
 {
-  "device_id": "HELMET_001",
+  "device_id": "H001",
   "alcohol_level": 1450,
-  "drowsiness_status": 1,
-  "accident_detected": 0,
-  "acceleration": {
-    "x": 120,
-    "y": -85,
-    "z": 16200
-  },
-  "timestamp": "2026-03-28T10:30:00Z"
+  "alcohol_detected": false,
+  "drowsiness": false,
+  "fall_detected": false,
+  "communication_mode": "WIFI_HTTP",
+  "latitude": 12.650689,
+  "longitude": 78.604675,
+  "gps_fix": false,
+  "signal_strength": "STRONG"
 }
 ```
 
 ## Integration Steps
 
-1. Copy `secrets.example.h` to `secrets.h`
-2. Update Wi-Fi credentials, backend server URL, device ID, and device API key
-3. Open `esp32_smart_helmet.ino` in Arduino IDE
-4. Install the required libraries:
+1. Update Wi-Fi credentials, backend server URL, device ID, and device API key directly in `esp32_smart_helmet.ino`
+2. Open `esp32_smart_helmet.ino` in Arduino IDE
+3. Install the required libraries:
    - `MPU6050` by Electronic Cats or compatible Jeff Rowberg-style MPU6050 library
    - `ArduinoJson`
-5. Select the ESP32 board and COM port
-6. Upload the sketch
-7. Open Serial Monitor at `115200`
-8. Confirm the ESP32 prints successful HTTP response codes
+4. Select the ESP32 board and COM port
+5. Upload the sketch
+6. Open Serial Monitor at `115200`
+7. Confirm the ESP32 prints successful HTTP response codes
 
 ## Notes
 
 - The buzzer is controlled locally for fast rider feedback
 - The backend accepts this hardware JSON directly and normalizes it internally
 - If Wi-Fi drops, the sketch automatically attempts reconnection
+- GSM is still used for local emergency SMS from the helmet
 - Thresholds can be tuned in the sketch based on real sensor calibration
 - The sketch sends normal telemetry every 5 seconds
-- The sketch also sends immediately during alcohol, drowsiness, or accident conditions
-- `IR_ACTIVE_LOW` can be changed in the sketch if the eye sensor wiring behaves as active-high
+- If GPS does not have a live fix, the sketch sends the default fallback location `12.65068910917473, 78.60467542494665`
 - If `DEVICE_API_KEY` is set in the backend, the ESP32 sends it as `x-device-key` automatically

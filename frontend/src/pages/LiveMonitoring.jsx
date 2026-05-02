@@ -1,9 +1,10 @@
-import { Activity, Battery } from 'lucide-react';
+import { Activity, Battery, MapPinned, RadioTower } from 'lucide-react';
 import { useSocket } from '../context/SocketContext';
 import StatusIndicator from '../components/StatusIndicator';
 import SignalIndicator from '../components/SignalIndicator';
 import PageHeader from '../components/PageHeader';
 import { getAccidentSeverity } from '../utils/severity';
+import { buildMapLink, formatAltitude, formatCoordinate, formatSignalDbm, formatSpeed } from '../utils/telemetry';
 
 export default function LiveMonitoring() {
   const { liveData, connectionStatus, helmetFeed, hardwareStatus, lastTelemetryAt } = useSocket();
@@ -45,9 +46,8 @@ export default function LiveMonitoring() {
 
   const isDanger = liveData.alcohol_detected || liveData.fall_detected || liveData.drowsiness;
   const severity = getAccidentSeverity(liveData);
+  const mapLink = buildMapLink(liveData.latitude, liveData.longitude);
   const severityStyles = {
-    green: 'border-emerald-500/30 bg-emerald-500/10 text-emerald-200',
-    yellow: 'border-amber-500/30 bg-amber-500/10 text-amber-200',
     red: 'border-rose-500/30 bg-rose-500/10 text-rose-200',
     slate: 'border-slate-700 bg-slate-900/70 text-slate-300',
   };
@@ -107,6 +107,22 @@ export default function LiveMonitoring() {
           <p className="text-sm text-slate-400">Battery Voltage</p>
           <p className="mt-3 text-xl font-semibold text-white">{liveData.battery_voltage ?? '--'} V</p>
         </div>
+        <div className="rounded-3xl border border-slate-800 bg-slate-950/70 p-5">
+          <p className="text-sm text-slate-400">GSM Operator</p>
+          <p className="mt-3 text-xl font-semibold text-white">{liveData.gsm_operator || '--'}</p>
+        </div>
+        <div className="rounded-3xl border border-slate-800 bg-slate-950/70 p-5">
+          <p className="text-sm text-slate-400">GSM Signal</p>
+          <p className="mt-3 text-xl font-semibold text-white">{formatSignalDbm(liveData.gsm_signal_dbm)}</p>
+        </div>
+        <div className="rounded-3xl border border-slate-800 bg-slate-950/70 p-5">
+          <p className="text-sm text-slate-400">GPS Fix</p>
+          <p className="mt-3 text-xl font-semibold text-white">{liveData.gps_fix ? 'LOCKED' : 'SEARCHING'}</p>
+        </div>
+        <div className="rounded-3xl border border-slate-800 bg-slate-950/70 p-5">
+          <p className="text-sm text-slate-400">Satellites</p>
+          <p className="mt-3 text-xl font-semibold text-white">{liveData.gps_satellites ?? '--'}</p>
+        </div>
       </div>
 
       <div className="grid gap-4 md:grid-cols-2">
@@ -124,12 +140,49 @@ export default function LiveMonitoring() {
         </div>
       </div>
 
+      <div className="grid gap-4 md:grid-cols-2">
+        <div className="rounded-3xl border border-slate-800 bg-slate-950/70 p-5">
+          <div className="flex items-center gap-3">
+            <RadioTower className="text-cyan-300" size={18} />
+            <p className="text-sm text-slate-400">Emergency GSM Metadata</p>
+          </div>
+          <p className="mt-3 text-lg font-semibold text-white">
+            {liveData.gsm_network || 'GSM900'} / {liveData.gsm_registered ? 'Registered' : 'Searching network'}
+          </p>
+          <p className="mt-2 text-sm text-slate-400">
+            Operator {liveData.gsm_operator || '--'} / Signal {formatSignalDbm(liveData.gsm_signal_dbm)} / Mode {liveData.communication_mode || 'GSM_GPRS'}
+          </p>
+        </div>
+        <div className="rounded-3xl border border-slate-800 bg-slate-950/70 p-5">
+          <div className="flex items-center gap-3">
+            <MapPinned className="text-cyan-300" size={18} />
+            <p className="text-sm text-slate-400">GPS Tracking</p>
+          </div>
+          <p className="mt-3 text-lg font-semibold text-white">
+            {formatCoordinate(liveData.latitude)}, {formatCoordinate(liveData.longitude)}
+          </p>
+          <p className="mt-2 text-sm text-slate-400">
+            Speed {formatSpeed(liveData.gps_speed)} / Altitude {formatAltitude(liveData.gps_altitude)} / Update {liveData.gps_last_update ? new Date(liveData.gps_last_update).toLocaleTimeString() : '--'}
+          </p>
+          {mapLink ? (
+            <a
+              href={mapLink}
+              target="_blank"
+              rel="noreferrer"
+              className="mt-4 inline-flex rounded-2xl border border-cyan-400/20 bg-cyan-400/10 px-4 py-2 text-sm font-semibold text-cyan-200 transition hover:bg-cyan-400/20"
+            >
+              Open live location
+            </a>
+          ) : null}
+        </div>
+      </div>
+
       <div className={`rounded-3xl border p-5 ${severityStyles[severity.color]}`}>
         <p className="text-sm uppercase tracking-[0.24em]">Accident Severity</p>
         <p className="mt-3 text-2xl font-semibold">
           Level {severity.level || 0} - {severity.label}
         </p>
-        <p className="mt-3 text-sm">Severity Score = Acceleration + Tilt Angle + Impact Force</p>
+        <p className="mt-3 text-sm">Any detected accident is shown in red.</p>
         <p className="mt-2 text-sm">
           Acceleration: {severity.acceleration.toFixed(2)} / Tilt Angle: {severity.tiltAngle.toFixed(2)} / Impact Force: {severity.impactForce.toFixed(2)}
         </p>
@@ -143,7 +196,9 @@ export default function LiveMonitoring() {
               <SignalIndicator signal={item.signal_strength || 'MODERATE'} />
             </div>
             <p className="mt-3 text-sm text-slate-400">{new Date(item.timestamp).toLocaleString()}</p>
-            <p className="mt-3 text-sm text-slate-300">Communication mode: {item.communication_mode || 'HTTP'}</p>
+            <p className="mt-3 text-sm text-slate-300">
+              {item.communication_mode || 'HTTP'} / {item.gsm_operator || 'Operator pending'} / GPS {item.gps_fix ? 'LOCKED' : 'SEARCHING'}
+            </p>
           </div>
         ))}
       </div>

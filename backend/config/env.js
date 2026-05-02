@@ -30,4 +30,9 @@ module.exports = {
   healthWindowMinutes: parseNumber(process.env.HEALTH_WINDOW_MINUTES, 10),
   hardwareOfflineThresholdSeconds: parseNumber(process.env.HARDWARE_OFFLINE_THRESHOLD_SECONDS, 15),
   deviceApiKey: process.env.DEVICE_API_KEY || "",
+  defaultLatitude: parseNumber(process.env.DEFAULT_LATITUDE, 12.65068910917473),
+  defaultLongitude: parseNumber(process.env.DEFAULT_LONGITUDE, 78.60467542494665),
+  fast2smsApiKey: process.env.FAST2SMS_API_KEY || "",
+  fast2smsRoute: process.env.FAST2SMS_ROUTE || "q",
+  fast2smsLanguage: process.env.FAST2SMS_LANGUAGE || "english",
 };

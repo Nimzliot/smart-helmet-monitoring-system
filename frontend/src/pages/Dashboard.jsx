@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Activity, BellRing, BatteryCharging, Radio, ShieldAlert, HardHat, Server, Wifi } from 'lucide-react';
+import { Activity, BellRing, BatteryCharging, MapPinned, Radio, ShieldAlert, HardHat, Server, Wifi } from 'lucide-react';
 import MetricCard from '../components/MetricCard';
 import BatteryIndicator from '../components/BatteryIndicator';
 import SignalIndicator from '../components/SignalIndicator';
@@ -8,6 +8,7 @@ import PageHeader from '../components/PageHeader';
 import { apiRequest } from '../services/api';
 import { useSocket } from '../context/SocketContext';
 import { getAccidentSeverity } from '../utils/severity';
+import { buildMapLink, formatAltitude, formatCoordinate, formatSignalDbm, formatSpeed } from '../utils/telemetry';
 
 export default function Dashboard() {
   const [snapshot, setSnapshot] = useState(null);
@@ -67,8 +68,6 @@ export default function Dashboard() {
   const displayBatteryLevel = Number.isFinite(Number(status?.battery_status)) ? Number(status.battery_status) : averageBattery;
   const lastUpdateText = hasTelemetry ? new Date(status.timestamp).toLocaleString() : 'Waiting for first telemetry packet';
   const severityTone = {
-    green: 'border-emerald-500/30 bg-emerald-500/10 text-emerald-200',
-    yellow: 'border-amber-500/30 bg-amber-500/10 text-amber-200',
     red: 'border-rose-500/30 bg-rose-500/10 text-rose-200',
     slate: 'border-slate-700 bg-slate-900/70 text-slate-300',
   };
@@ -88,6 +87,7 @@ export default function Dashboard() {
       : displayHardwareStatus === 'DISCONNECTED'
         ? 'HARDWARE DISCONNECTED'
         : 'WAITING FOR HARDWARE';
+  const mapLink = buildMapLink(status?.latitude, status?.longitude);
 
   return (
     <div className="space-y-8">
@@ -159,7 +159,7 @@ export default function Dashboard() {
                   },
                   {
                     title: 'Connect ESP32',
-                    body: 'Point the embedded firmware to your backend IP and send packets to /api/helmet-data.',
+                    body: 'Connect the ESP32 to the same Wi-Fi as the backend and send packets to /api/helmet-data.',
                     icon: Wifi,
                   },
                   {
@@ -191,9 +191,11 @@ export default function Dashboard() {
                   </p>
                 </div>
                 <div className="rounded-3xl border border-slate-800 bg-slate-900/80 p-5">
-                  <p className="text-sm text-slate-400">Communication</p>
+                  <p className="text-sm text-slate-400">Wi-Fi Telemetry</p>
                   <div className="mt-4"><SignalIndicator signal={status.signal_strength || 'MODERATE'} /></div>
-                  <p className="mt-3 text-xs text-slate-500">Mode: {status.communication_mode || 'HTTP'}</p>
+                  <p className="mt-3 text-xs text-slate-500">
+                    Mode: {status.communication_mode || 'HTTP'} / Network metadata: {status.gsm_network || 'GSM900'} / {formatSignalDbm(status.gsm_signal_dbm)}
+                  </p>
                 </div>
                 <div className="rounded-3xl border border-slate-800 bg-slate-900/80 p-5">
                   <p className="text-sm text-slate-400">MQ-3 Alcohol Sensor</p>
@@ -206,6 +208,22 @@ export default function Dashboard() {
                     Blink Rate: {status.blink_rate ?? '--'} / Eye Closure: {status.eye_closure_duration ?? '--'}{status.eye_closure_duration != null ? 's' : ''}
                   </p>
                   <p className="mt-3 text-xs text-slate-500">Drowsiness: {String(Boolean(status.drowsiness))}</p>
+                </div>
+                <div className="rounded-3xl border border-slate-800 bg-slate-900/80 p-5">
+                  <p className="text-sm text-slate-400">Emergency GSM Module</p>
+                  <p className="mt-4 text-lg font-semibold text-white">
+                    {status.gsm_operator || 'Operator pending'} / {status.gsm_registered ? 'Registered' : 'Searching'}
+                  </p>
+                  <p className="mt-3 text-xs text-slate-500">Network: {status.gsm_network || 'GSM900'} / Signal: {formatSignalDbm(status.gsm_signal_dbm)}</p>
+                </div>
+                <div className="rounded-3xl border border-slate-800 bg-slate-900/80 p-5">
+                  <p className="text-sm text-slate-400">GPS Tracking</p>
+                  <p className="mt-4 text-lg font-semibold text-white">
+                    {status.gps_fix ? 'Fix acquired' : 'Waiting for fix'} / {status.gps_satellites ?? '--'} satellites
+                  </p>
+                  <p className="mt-3 text-xs text-slate-500">
+                    Speed: {formatSpeed(status.gps_speed)} / Altitude: {formatAltitude(status.gps_altitude)}
+                  </p>
                 </div>
               </div>
 
@@ -223,6 +241,37 @@ export default function Dashboard() {
                     X: {status.gyro_x ?? '--'} / Y: {status.gyro_y ?? '--'} / Z: {status.gyro_z ?? '--'}
                   </p>
                   <p className="mt-3 text-xs text-slate-500">Accident/Fall: {String(Boolean(status.fall_detected))}</p>
+                </div>
+              </div>
+
+              <div className="mt-4 rounded-3xl border border-slate-800 bg-slate-900/80 p-5">
+                <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+                  <div>
+                    <p className="text-sm text-slate-400">Last Known GPS Coordinates</p>
+                    <p className="mt-3 text-lg font-semibold text-white">
+                      {formatCoordinate(status.latitude)}, {formatCoordinate(status.longitude)}
+                    </p>
+                    <p className="mt-3 text-xs text-slate-500">
+                      GPS update: {status.gps_last_update ? new Date(status.gps_last_update).toLocaleString() : 'Awaiting module data'}
+                    </p>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <div className="rounded-2xl bg-slate-950/80 p-3 text-cyan-300">
+                      <MapPinned size={18} />
+                    </div>
+                    {mapLink ? (
+                      <a
+                        href={mapLink}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="rounded-2xl border border-cyan-400/20 bg-cyan-400/10 px-4 py-3 text-sm font-semibold text-cyan-200 transition hover:bg-cyan-400/20"
+                      >
+                        Open in Maps
+                      </a>
+                    ) : (
+                      <span className="rounded-2xl border border-slate-800 px-4 py-3 text-sm text-slate-500">No GPS coordinates yet</span>
+                    )}
+                  </div>
                 </div>
               </div>
             </>
@@ -253,7 +302,7 @@ export default function Dashboard() {
             <p className="mt-3 text-2xl font-semibold">
               {hasTelemetry ? `Level ${severity.level || 0} - ${severity.label}` : 'Waiting for telemetry'}
             </p>
-            <p className="mt-3 text-sm">Green = Minor, Yellow = Medium, Red = Severe</p>
+            <p className="mt-3 text-sm">Any accident state is highlighted in red.</p>
           </div>
         </div>
 

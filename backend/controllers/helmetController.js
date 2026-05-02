@@ -3,12 +3,14 @@ const db = require("../services/databaseService");
 const { createAlertsFromRecord } = require("../services/alertService");
 
 const buildMockStatus = () => ({
-  status: "No logs found or Supabase not configured. Start the simulator.",
+  status: "No logs found yet. Start the simulator or connect the ESP32.",
   mock: true,
 });
 
 const normalizeHardwarePayload = (body) => {
   const acceleration = body.acceleration || {};
+  const gps = body.gps || {};
+  const gsm = body.gsm || {};
   const drowsinessDetected =
     body.drowsiness !== undefined
       ? body.drowsiness
@@ -42,9 +44,18 @@ const normalizeHardwarePayload = (body) => {
     fall_detected: body.fall_detected ?? body.accident_detected,
     battery_status: body.battery_status,
     timestamp: body.timestamp,
-    latitude: body.latitude,
-    longitude: body.longitude,
-    signal_strength: body.signal_strength,
+    latitude: body.latitude ?? gps.latitude ?? gps.lat,
+    longitude: body.longitude ?? gps.longitude ?? gps.lng,
+    gps_fix: body.gps_fix ?? gps.fix,
+    gps_satellites: body.gps_satellites ?? gps.satellites,
+    gps_speed: body.gps_speed ?? gps.speed,
+    gps_altitude: body.gps_altitude ?? gps.altitude,
+    gps_last_update: body.gps_last_update ?? gps.timestamp,
+    signal_strength: body.signal_strength ?? gsm.signal_strength,
+    gsm_signal_dbm: body.gsm_signal_dbm ?? gsm.signal_dbm,
+    gsm_network: body.gsm_network ?? gsm.network,
+    gsm_operator: body.gsm_operator ?? gsm.operator,
+    gsm_registered: body.gsm_registered ?? gsm.registered,
   };
 };
 
@@ -57,10 +68,18 @@ const postHelmetData = asyncHandler(async (req, res) => {
 
   io.emit("helmet-update", record);
   io.emit("helmet:update", { record, helmet });
+  io.emit("helmet:heartbeat", {
+    helmet_id: record.helmet_id,
+    timestamp: record.timestamp,
+    communication_mode: record.communication_mode,
+    gps_fix: record.gps_fix,
+  });
   io.emit("helmet:location", {
     helmet_id: record.helmet_id,
     latitude: record.latitude,
     longitude: record.longitude,
+    gps_fix: record.gps_fix,
+    gps_satellites: record.gps_satellites,
     timestamp: record.timestamp,
   });
 

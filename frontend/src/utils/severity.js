@@ -28,12 +28,12 @@ export function getAccidentSeverity(data) {
   }
 
   if (score >= 10) {
-    return { level: 3, label: 'Severe', color: 'red', score, acceleration, tiltAngle, impactForce };
+    return { level: 3, label: 'Accident', color: 'red', score, acceleration, tiltAngle, impactForce };
   }
 
   if (score >= 5) {
-    return { level: 2, label: 'Medium', color: 'yellow', score, acceleration, tiltAngle, impactForce };
+    return { level: 2, label: 'Accident', color: 'red', score, acceleration, tiltAngle, impactForce };
   }
 
-  return { level: 1, label: 'Minor', color: 'green', score, acceleration, tiltAngle, impactForce };
+  return { level: 1, label: 'Accident', color: 'red', score, acceleration, tiltAngle, impactForce };
 }

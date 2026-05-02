@@ -22,6 +22,15 @@ CREATE TABLE IF NOT EXISTS public.helmets (
   last_seen timestamptz,
   latitude double precision,
   longitude double precision,
+  communication_mode text DEFAULT 'GSM_GPRS',
+  gsm_network text DEFAULT 'GSM900',
+  gsm_operator text,
+  gsm_signal_dbm double precision,
+  gsm_registered boolean DEFAULT false,
+  gps_fix boolean DEFAULT false,
+  gps_satellites integer DEFAULT 0,
+  gps_speed double precision,
+  gps_altitude double precision,
   created_at timestamptz NOT NULL DEFAULT now()
 );
 
@@ -92,7 +101,16 @@ CREATE TABLE IF NOT EXISTS public.helmet_logs (
   battery_status integer NOT NULL DEFAULT 100 CHECK (battery_status >= 0 AND battery_status <= 100),
   latitude double precision,
   longitude double precision,
+  gps_fix boolean DEFAULT false,
+  gps_satellites integer DEFAULT 0,
+  gps_speed double precision,
+  gps_altitude double precision,
+  gps_last_update timestamptz,
   signal_strength text DEFAULT 'MODERATE',
+  gsm_signal_dbm double precision,
+  gsm_network text DEFAULT 'GSM900',
+  gsm_operator text,
+  gsm_registered boolean DEFAULT false,
   timestamp timestamptz NOT NULL DEFAULT now()
 );
 
@@ -117,7 +135,16 @@ ADD COLUMN IF NOT EXISTS severity_color text DEFAULT 'slate',
 ADD COLUMN IF NOT EXISTS battery_status integer NOT NULL DEFAULT 100,
 ADD COLUMN IF NOT EXISTS latitude double precision,
 ADD COLUMN IF NOT EXISTS longitude double precision,
+ADD COLUMN IF NOT EXISTS gps_fix boolean DEFAULT false,
+ADD COLUMN IF NOT EXISTS gps_satellites integer DEFAULT 0,
+ADD COLUMN IF NOT EXISTS gps_speed double precision,
+ADD COLUMN IF NOT EXISTS gps_altitude double precision,
+ADD COLUMN IF NOT EXISTS gps_last_update timestamptz,
 ADD COLUMN IF NOT EXISTS signal_strength text DEFAULT 'MODERATE',
+ADD COLUMN IF NOT EXISTS gsm_signal_dbm double precision,
+ADD COLUMN IF NOT EXISTS gsm_network text DEFAULT 'GSM900',
+ADD COLUMN IF NOT EXISTS gsm_operator text,
+ADD COLUMN IF NOT EXISTS gsm_registered boolean DEFAULT false,
 ADD COLUMN IF NOT EXISTS timestamp timestamptz NOT NULL DEFAULT now();
 
 ALTER TABLE public.helmet_logs
@@ -143,6 +170,15 @@ ALTER TABLE public.helmets
 ADD COLUMN IF NOT EXISTS last_seen timestamptz,
 ADD COLUMN IF NOT EXISTS latitude double precision,
 ADD COLUMN IF NOT EXISTS longitude double precision,
+ADD COLUMN IF NOT EXISTS communication_mode text DEFAULT 'GSM_GPRS',
+ADD COLUMN IF NOT EXISTS gsm_network text DEFAULT 'GSM900',
+ADD COLUMN IF NOT EXISTS gsm_operator text,
+ADD COLUMN IF NOT EXISTS gsm_signal_dbm double precision,
+ADD COLUMN IF NOT EXISTS gsm_registered boolean DEFAULT false,
+ADD COLUMN IF NOT EXISTS gps_fix boolean DEFAULT false,
+ADD COLUMN IF NOT EXISTS gps_satellites integer DEFAULT 0,
+ADD COLUMN IF NOT EXISTS gps_speed double precision,
+ADD COLUMN IF NOT EXISTS gps_altitude double precision,
 ADD COLUMN IF NOT EXISTS created_at timestamptz NOT NULL DEFAULT now();
 
 ALTER TABLE public.alerts
@@ -234,8 +270,9 @@ CREATE POLICY "Allow alert insert"
   WITH CHECK (true);
 
 INSERT INTO public.riders (id, name, phone, emergency_contact, email)
-VALUES ('R001', 'Asha Verma', '+91-9876543210', '+91-9988776655', 'asha.rider@smarthelmet.local')
-ON CONFLICT (id) DO NOTHING;
+VALUES ('R001', 'Harini', '+91-9876543210', '+91-9988776655', 'asha.rider@smarthelmet.local')
+ON CONFLICT (id) DO UPDATE
+SET name = EXCLUDED.name;
 
 DO $$
 DECLARE
@@ -267,9 +304,13 @@ BEGIN
   END IF;
 END $$;
 
-INSERT INTO public.helmets (helmet_id, rider_id, status, battery_level, latitude, longitude)
+INSERT INTO public.helmets (
+  helmet_id, rider_id, status, battery_level, latitude, longitude,
+  communication_mode, gsm_network, gsm_operator, gsm_signal_dbm, gsm_registered,
+  gps_fix, gps_satellites, gps_speed, gps_altitude
+)
 VALUES
-  ('H001', 'R001', 'ACTIVE', 92, 12.9716, 77.5946),
-  ('H002', null, 'IDLE', 86, 12.9754, 77.5992),
-  ('H003', null, 'IDLE', 74, 12.9688, 77.5899)
+  ('H001', 'R001', 'ACTIVE', 92, 12.9716, 77.5946, 'GSM_GPRS', 'GSM900', 'Airtel', -71, true, true, 8, 42.5, 921.4),
+  ('H002', null, 'IDLE', 86, 12.9754, 77.5992, 'GSM_GPRS', 'GSM900', 'Jio', -79, true, true, 6, 0, 918.8),
+  ('H003', null, 'IDLE', 74, 12.9688, 77.5899, 'GSM_GPRS', 'GSM900', 'Vi', -88, false, false, 0, 0, null)
 ON CONFLICT (helmet_id) DO NOTHING;

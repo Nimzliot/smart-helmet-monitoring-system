@@ -3,12 +3,16 @@ import BatteryIndicator from '../components/BatteryIndicator';
 import PageHeader from '../components/PageHeader';
 import { apiRequest } from '../services/api';
 import { useAuth } from '../hooks/useAuth';
+import { formatCoordinate, formatSignalDbm, formatSpeed } from '../utils/telemetry';
 
 const initialForm = {
   helmet_id: '',
   rider_id: '',
   status: 'IDLE',
   battery_level: 100,
+  communication_mode: 'GSM_GPRS',
+  gsm_network: 'GSM900',
+  gsm_operator: '',
 };
 
 export default function Helmets() {
@@ -101,6 +105,18 @@ export default function Helmets() {
             <span className="mb-2 block text-sm text-slate-400">Battery Level</span>
             <input type="number" min="0" max="100" disabled={!isAdmin} value={form.battery_level} onChange={(e) => setForm((current) => ({ ...current, battery_level: e.target.value }))} className="w-full rounded-2xl border border-slate-800 bg-slate-900 px-4 py-3 text-white outline-none focus:ring-2 focus:ring-cyan-400" />
           </label>
+          <label className="block">
+            <span className="mb-2 block text-sm text-slate-400">Communication Mode</span>
+            <input disabled={!isAdmin} value={form.communication_mode} onChange={(e) => setForm((current) => ({ ...current, communication_mode: e.target.value }))} className="w-full rounded-2xl border border-slate-800 bg-slate-900 px-4 py-3 text-white outline-none focus:ring-2 focus:ring-cyan-400" />
+          </label>
+          <label className="block">
+            <span className="mb-2 block text-sm text-slate-400">GSM Network</span>
+            <input disabled={!isAdmin} value={form.gsm_network} onChange={(e) => setForm((current) => ({ ...current, gsm_network: e.target.value }))} className="w-full rounded-2xl border border-slate-800 bg-slate-900 px-4 py-3 text-white outline-none focus:ring-2 focus:ring-cyan-400" />
+          </label>
+          <label className="block">
+            <span className="mb-2 block text-sm text-slate-400">Preferred GSM Operator</span>
+            <input disabled={!isAdmin} value={form.gsm_operator} onChange={(e) => setForm((current) => ({ ...current, gsm_operator: e.target.value }))} className="w-full rounded-2xl border border-slate-800 bg-slate-900 px-4 py-3 text-white outline-none focus:ring-2 focus:ring-cyan-400" />
+          </label>
           {feedback ? (
             <div className="rounded-2xl border border-slate-800 bg-slate-900/70 px-4 py-3 text-sm text-slate-300">
               {feedback}
@@ -124,6 +140,25 @@ export default function Helmets() {
               </div>
               <div className="mt-4">
                 <BatteryIndicator level={helmet.battery_level || 0} />
+              </div>
+              <div className="mt-4 grid gap-3 md:grid-cols-2">
+                <div className="rounded-2xl border border-slate-800 bg-slate-950/60 px-4 py-3">
+                  <p className="text-xs uppercase tracking-[0.2em] text-slate-500">GSM</p>
+                  <p className="mt-2 text-sm font-semibold text-white">{helmet.gsm_network || 'GSM900'}</p>
+                  <p className="mt-1 text-xs text-slate-400">
+                    {helmet.gsm_operator || 'Operator pending'} / {helmet.gsm_registered ? 'Registered' : 'Inactive'} / {formatSignalDbm(helmet.gsm_signal_dbm)}
+                  </p>
+                </div>
+                <div className="rounded-2xl border border-slate-800 bg-slate-950/60 px-4 py-3">
+                  <p className="text-xs uppercase tracking-[0.2em] text-slate-500">GPS</p>
+                  <p className="mt-2 text-sm font-semibold text-white">{helmet.gps_fix ? 'Fix available' : 'No fix yet'}</p>
+                  <p className="mt-1 text-xs text-slate-400">
+                    {formatCoordinate(helmet.latitude)}, {formatCoordinate(helmet.longitude)}
+                  </p>
+                  <p className="mt-1 text-xs text-slate-500">
+                    {helmet.gps_satellites ?? '--'} sats / {formatSpeed(helmet.gps_speed)}
+                  </p>
+                </div>
               </div>
             </div>
           ))}

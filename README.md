@@ -93,6 +93,11 @@ PORT=5000
 JWT_SECRET=replace-with-a-secure-secret
 FRONTEND_URL=http://localhost:5173,http://localhost:5174
 DEVICE_API_KEY=shared-device-key-for-esp32
+DEFAULT_LATITUDE=12.65068910917473
+DEFAULT_LONGITUDE=78.60467542494665
+FAST2SMS_API_KEY=your_fast2sms_api_key
+FAST2SMS_ROUTE=q
+FAST2SMS_LANGUAGE=english
 ```
 
 Do not commit `backend/.env` to GitHub.
@@ -105,6 +110,22 @@ The `embedded/` folder contains the ESP32 scaffold for:
 - IR eye blink based drowsiness detection
 - MPU6050 fall/accident detection
 - Wi-Fi HTTP telemetry posting to the backend
+- default GPS fallback coordinates when no live GPS fix is available
+
+Current ESP32 data flow:
+
+- ESP32 connects to the same Wi‑Fi network as the backend machine
+- ESP32 sends `POST /api/helmet-data` over Wi‑Fi HTTP
+- Backend normalizes and stores the payload in Supabase or memory fallback
+- Backend emits live Socket.IO events to the dashboard
+- GSM on the helmet remains available for direct emergency SMS
+
+## Emergency SMS Workflow
+
+- Existing ESP32 GSM/SMS flow remains unchanged.
+- Backend can now send an additional Fast2SMS emergency message to the rider emergency contact.
+- SMS includes vehicle identifier, rider name, and a Google Maps link.
+- If GPS is unavailable, the project falls back to `12.65068910917473, 78.60467542494665` so alerts still include a location link.
 
 ## Prototype Features
 
@@ -114,5 +135,5 @@ The `embedded/` folder contains the ESP32 scaffold for:
 - Severity-based alert generation
 - History and analytics views
 - Supabase-backed persistence
-- In-memory fallback for local demo use
+- Supabase-backed runtime persistence
 - Realtime Socket.IO updates

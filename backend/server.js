@@ -3,6 +3,7 @@ const { Server } = require("socket.io");
 const app = require("./app");
 const env = require("./config/env");
 const { logger } = require("./config/logger");
+const { checkSupabaseConnection } = require("./config/supabase");
 
 const server = http.createServer(app);
 const io = new Server(server, {
@@ -35,4 +36,16 @@ server.on("error", (error) => {
 
 server.listen(env.port, () => {
   logger.info(`Smart Helmet backend running on port ${env.port}`);
+
+  checkSupabaseConnection()
+    .then((result) => {
+      if (result.status === "ok") {
+        logger.info("Supabase connected");
+      } else {
+        logger.error(`Supabase connection failed: ${result.error}`);
+      }
+    })
+    .catch((error) => {
+      logger.error(`Supabase connection failed: ${error.message}`);
+    });
 });

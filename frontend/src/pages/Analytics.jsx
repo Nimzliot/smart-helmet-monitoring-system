@@ -49,9 +49,9 @@ export default function Analytics() {
             return acc;
           },
           [
-            { name: 'Minor (Level 1)', count: 0, fill: '#10b981' },
-            { name: 'Medium (Level 2)', count: 0, fill: '#f59e0b' },
-            { name: 'Severe (Level 3)', count: 0, fill: '#f43f5e' },
+            { name: 'Level 1 Accident', count: 0, fill: '#f43f5e' },
+            { name: 'Level 2 Accident', count: 0, fill: '#f43f5e' },
+            { name: 'Level 3 Accident', count: 0, fill: '#f43f5e' },
           ]
         );
 
@@ -139,7 +139,7 @@ export default function Analytics() {
         <div className="rounded-[2rem] border border-slate-800 bg-slate-950/70 p-6">
           <div className="mb-6">
             <h3 className="text-lg font-semibold text-white">Accident severity distribution</h3>
-            <p className="text-sm text-slate-400">Minor, medium, and severe accident events stored in the telemetry pipeline.</p>
+            <p className="text-sm text-slate-400">All accident levels are presented with a single red alert style.</p>
           </div>
           <div className="h-80">
             <ResponsiveContainer width="100%" height="100%">
