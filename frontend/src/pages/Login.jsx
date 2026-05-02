@@ -4,8 +4,8 @@ import { ShieldAlert, KeyRound, Mail } from 'lucide-react';
 import { useAuth } from '../hooks/useAuth';
 
 export default function Login() {
-  const [email, setEmail] = useState('admin@smarthelmet.local');
-  const [password, setPassword] = useState('admin123');
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const navigate = useNavigate();
@@ -59,7 +59,7 @@ export default function Login() {
             </div>
             <h2 className="text-2xl font-semibold text-white">Secure Operator Login</h2>
             <p className="mt-2 text-center text-sm text-slate-400">
-              Use <span className="font-semibold text-slate-200">admin@smarthelmet.local / admin123</span> to enter the control room.
+              Enter your Gmail and password to access the control room.
             </p>
           </div>
 
@@ -79,6 +79,7 @@ export default function Login() {
                 <input
                   type="email"
                   required
+                  placeholder="your gmail"
                   className="block w-full rounded-2xl border border-slate-800 bg-slate-900 pl-10 pr-3 py-3 text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-cyan-400"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
@@ -95,6 +96,7 @@ export default function Login() {
                 <input
                   type="password"
                   required
+                  placeholder="your password"
                   className="block w-full rounded-2xl border border-slate-800 bg-slate-900 pl-10 pr-3 py-3 text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-cyan-400"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
