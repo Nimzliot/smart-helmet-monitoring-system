@@ -11,8 +11,18 @@ const buildMapLink = (location) =>
     : null;
 
 const buildEventLabel = (record) => {
-  if (record?.fall_detected) return "Accident detected";
-  if (record?.alcohol_detected && record?.drowsiness) return "Alcohol and drowsiness detected";
+  const alcohol = Boolean(record?.alcohol_detected);
+  const drowsiness = Boolean(record?.drowsiness);
+  const fall = Boolean(record?.fall_detected);
+  const active = [
+    alcohol ? "alcohol" : null,
+    drowsiness ? "drowsiness" : null,
+    fall ? "fall" : null,
+  ].filter(Boolean);
+
+  if (active.length === 3) return "Alcohol, drowsiness, and fall detected";
+  if (active.length === 2) return `${active[0][0].toUpperCase()}${active[0].slice(1)} and ${active[1]} detected`;
+  if (fall) return "Accident detected";
   if (record?.alcohol_detected) return "Alcohol detected";
   if (record?.drowsiness) return "Drowsiness detected";
   return "Emergency detected";
