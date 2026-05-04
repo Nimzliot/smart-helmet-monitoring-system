@@ -21,8 +21,10 @@
 #define MQ3_PIN 34
 #define IR_PIN 27
 #define BUZZER_PIN 25
-#define IR_ACTIVE_STATE LOW
-#define IR_CONFIRM_COUNT 25
+#define IR_ACTIVE_STATE HIGH
+#define IR_SAMPLE_COUNT 15
+#define IR_SAMPLE_DELAY_MS 3
+#define IR_MIN_CLOSED_MS 2000
 
 #define NORMAL_INTERVAL 5000
 #define WIFI_RETRY_INTERVAL 5000
@@ -36,9 +38,9 @@ MPU6050 mpu;
 
 unsigned long lastSend = 0;
 unsigned long lastWifiAttempt = 0;
+unsigned long eyeClosedStartedAt = 0;
 
-int irClosedSamples = 0;
-int irOpenSamples = 0;
+int lastIrRawState = HIGH;
 
 struct GpsData {
   bool fix;
@@ -82,24 +84,27 @@ int readMQ3() {
 }
 
 bool isEyeClosed() {
-  bool detected = digitalRead(IR_PIN) == IR_ACTIVE_STATE;
+  int activeSamples = 0;
 
-  if (detected) {
-    if (irClosedSamples < IR_CONFIRM_COUNT) {
-      irClosedSamples += 1;
+  for (int i = 0; i < IR_SAMPLE_COUNT; i++) {
+    lastIrRawState = digitalRead(IR_PIN);
+    if (lastIrRawState == IR_ACTIVE_STATE) {
+      activeSamples += 1;
     }
-    irOpenSamples = 0;
-  } else {
-    if (irOpenSamples < IR_CONFIRM_COUNT) {
-      irOpenSamples += 1;
-    }
-
-    if (irOpenSamples >= IR_CONFIRM_COUNT) {
-      irClosedSamples = 0;
-    }
+    delay(IR_SAMPLE_DELAY_MS);
   }
 
-  return irClosedSamples >= IR_CONFIRM_COUNT;
+  bool stableClosed = activeSamples >= (IR_SAMPLE_COUNT * 8) / 10;
+
+  if (stableClosed) {
+    if (eyeClosedStartedAt == 0) {
+      eyeClosedStartedAt = millis();
+    }
+  } else {
+    eyeClosedStartedAt = 0;
+  }
+
+  return eyeClosedStartedAt != 0 && (millis() - eyeClosedStartedAt >= IR_MIN_CLOSED_MS);
 }
 
 float getAccelMag(int16_t ax, int16_t ay, int16_t az) {
@@ -199,6 +204,8 @@ void loop() {
   Serial.print(alcoholDetected ? " DETECTED" : " SAFE");
   Serial.print(" Drowsy=");
   Serial.print(drowsinessDetected);
+  Serial.print(" IRraw=");
+  Serial.print(lastIrRawState);
   Serial.print(" Fall=");
   Serial.print(fallDetected);
   Serial.print(" GPS=");
