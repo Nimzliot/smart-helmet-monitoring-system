@@ -24,7 +24,8 @@
 #define IR_ACTIVE_STATE HIGH
 #define IR_SAMPLE_COUNT 15
 #define IR_SAMPLE_DELAY_MS 3
-#define IR_MIN_CLOSED_MS 2000
+#define IR_MIN_OPEN_MS 1500
+#define IR_MIN_CLOSED_MS 3000
 
 #define NORMAL_INTERVAL 5000
 #define WIFI_RETRY_INTERVAL 5000
@@ -39,8 +40,10 @@ MPU6050 mpu;
 unsigned long lastSend = 0;
 unsigned long lastWifiAttempt = 0;
 unsigned long eyeClosedStartedAt = 0;
+unsigned long eyeOpenStartedAt = 0;
 
 int lastIrRawState = HIGH;
+bool irDetectionArmed = false;
 
 struct GpsData {
   bool fix;
@@ -95,6 +98,24 @@ bool isEyeClosed() {
   }
 
   bool stableClosed = activeSamples >= (IR_SAMPLE_COUNT * 8) / 10;
+  bool stableOpen = !stableClosed;
+
+  if (stableOpen) {
+    if (eyeOpenStartedAt == 0) {
+      eyeOpenStartedAt = millis();
+    }
+
+    if (!irDetectionArmed && millis() - eyeOpenStartedAt >= IR_MIN_OPEN_MS) {
+      irDetectionArmed = true;
+    }
+  } else {
+    eyeOpenStartedAt = 0;
+  }
+
+  if (!irDetectionArmed) {
+    eyeClosedStartedAt = 0;
+    return false;
+  }
 
   if (stableClosed) {
     if (eyeClosedStartedAt == 0) {
@@ -206,6 +227,8 @@ void loop() {
   Serial.print(drowsinessDetected);
   Serial.print(" IRraw=");
   Serial.print(lastIrRawState);
+  Serial.print(" IRarmed=");
+  Serial.print(irDetectionArmed);
   Serial.print(" Fall=");
   Serial.print(fallDetected);
   Serial.print(" GPS=");
