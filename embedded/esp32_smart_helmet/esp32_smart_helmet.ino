@@ -22,7 +22,7 @@
 #define IR_PIN 27
 #define BUZZER_PIN 25
 #define IR_ACTIVE_STATE LOW
-#define IR_CONFIRM_COUNT 5
+#define IR_CONFIRM_COUNT 25
 
 #define NORMAL_INTERVAL 5000
 #define WIFI_RETRY_INTERVAL 5000
@@ -38,6 +38,7 @@ unsigned long lastSend = 0;
 unsigned long lastWifiAttempt = 0;
 
 int irClosedSamples = 0;
+int irOpenSamples = 0;
 
 struct GpsData {
   bool fix;
@@ -87,8 +88,15 @@ bool isEyeClosed() {
     if (irClosedSamples < IR_CONFIRM_COUNT) {
       irClosedSamples += 1;
     }
+    irOpenSamples = 0;
   } else {
-    irClosedSamples = 0;
+    if (irOpenSamples < IR_CONFIRM_COUNT) {
+      irOpenSamples += 1;
+    }
+
+    if (irOpenSamples >= IR_CONFIRM_COUNT) {
+      irClosedSamples = 0;
+    }
   }
 
   return irClosedSamples >= IR_CONFIRM_COUNT;
