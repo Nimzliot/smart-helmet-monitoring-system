@@ -31,7 +31,9 @@
 #define WIFI_RETRY_INTERVAL 5000
 
 #define MQ3_THRESHOLD 2000
-#define FALL_THRESHOLD 20000
+#define FALL_ACCEL_THRESHOLD 22000
+#define FALL_GYRO_THRESHOLD 18000
+#define FALL_RESET_MS 3000
 
 HardwareSerial gpsSerial(2);
 TinyGPSPlus gps;
@@ -41,6 +43,7 @@ unsigned long lastSend = 0;
 unsigned long lastWifiAttempt = 0;
 unsigned long eyeClosedStartedAt = 0;
 unsigned long eyeOpenStartedAt = 0;
+unsigned long fallDetectedAt = 0;
 
 int lastIrRawState = HIGH;
 bool irDetectionArmed = false;
@@ -132,6 +135,31 @@ float getAccelMag(int16_t ax, int16_t ay, int16_t az) {
   return sqrt((float)ax * ax + (float)ay * ay + (float)az * az);
 }
 
+float getGyroPeak(int16_t gx, int16_t gy, int16_t gz) {
+  float absGx = abs(gx);
+  float absGy = abs(gy);
+  float absGz = abs(gz);
+  return max(absGx, max(absGy, absGz));
+}
+
+bool detectFall(float accelMagnitude, float gyroPeak) {
+  unsigned long now = millis();
+  bool hardImpact = accelMagnitude >= FALL_ACCEL_THRESHOLD;
+  bool violentRotation = gyroPeak >= FALL_GYRO_THRESHOLD;
+
+  if (hardImpact || violentRotation) {
+    fallDetectedAt = now;
+    return true;
+  }
+
+  if (fallDetectedAt != 0 && now - fallDetectedAt < FALL_RESET_MS) {
+    return true;
+  }
+
+  fallDetectedAt = 0;
+  return false;
+}
+
 void updateGps() {
   while (gpsSerial.available()) {
     gps.encode(gpsSerial.read());
@@ -214,7 +242,9 @@ void loop() {
 
   int16_t ax, ay, az, gx, gy, gz;
   mpu.getMotion6(&ax, &ay, &az, &gx, &gy, &gz);
-  bool fallDetected = getAccelMag(ax, ay, az) > FALL_THRESHOLD;
+  float accelMagnitude = getAccelMag(ax, ay, az);
+  float gyroPeak = getGyroPeak(gx, gy, gz);
+  bool fallDetected = detectFall(accelMagnitude, gyroPeak);
 
   GpsData gpsData = getGpsData();
   bool unsafe = alcoholDetected || drowsinessDetected || fallDetected;
@@ -231,6 +261,10 @@ void loop() {
   Serial.print(irDetectionArmed);
   Serial.print(" Fall=");
   Serial.print(fallDetected);
+  Serial.print(" AccMag=");
+  Serial.print(accelMagnitude);
+  Serial.print(" GyroPeak=");
+  Serial.print(gyroPeak);
   Serial.print(" GPS=");
   Serial.println(gpsData.fix ? "OK" : "NO FIX");
   Serial.print("Location=");
