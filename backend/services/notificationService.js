@@ -2,6 +2,8 @@ const env = require("../config/env");
 const { logger } = require("../config/logger");
 
 const FAST2SMS_URL = "https://www.fast2sms.com/dev/bulkV2";
+const SMS_COOLDOWN_MS = 60 * 1000;
+const smsCooldownByHelmet = new Map();
 
 const normalizePhoneNumber = (value) => String(value || "").replace(/\D/g, "");
 
@@ -86,6 +88,11 @@ const sendFast2Sms = async ({ message, numbers }) => {
   return payload;
 };
 
+const isCooldownActive = (helmetId) => {
+  const lastSentAt = smsCooldownByHelmet.get(helmetId);
+  return lastSentAt ? Date.now() - lastSentAt < SMS_COOLDOWN_MS : false;
+};
+
 const notifyEmergencyContact = async ({ helmetId, helmet, rider, location, record }) => {
   const mapLink = buildMapLink(location);
   const configuredFast2SmsNumber = normalizePhoneNumber(env.fast2smsNumber);
@@ -102,8 +109,13 @@ const notifyEmergencyContact = async ({ helmetId, helmet, rider, location, recor
   logger.warn(
     `Emergency event stored for ${helmetId}. ` +
       `Contact ${smsRecipient || "N/A"} | ${mapLink || "Map unavailable"} | ` +
-      `ESP/GSM flow remains active${env.fast2smsApiKey ? " and backend Fast2SMS will be attempted." : "."}`
+      `Backend Fast2SMS flow${env.fast2smsApiKey ? " will be attempted." : " is not configured."}`
   );
+
+  if (isCooldownActive(helmetId)) {
+    logger.warn(`Fast2SMS skipped for ${helmetId}: cooldown active`);
+    return { skipped: true, reason: "cooldown active" };
+  }
 
   try {
     const smsResult = await sendFast2Sms({
@@ -116,6 +128,7 @@ const notifyEmergencyContact = async ({ helmetId, helmet, rider, location, recor
       return smsResult;
     }
 
+    smsCooldownByHelmet.set(helmetId, Date.now());
     logger.info(`Fast2SMS notification sent for ${helmetId}`);
     return smsResult;
   } catch (error) {
